@@ -171,6 +171,16 @@ class IngestionPipeline:
         if not chunk_metas:
             raise ValueError(f"No chunks were produced for {original_filename}")
 
+        # Anthropic's Contextual Retrieval
+        # We loop through the orphaned chunks and ask the Enrichment AI to sew them 
+        # back to the global summary before we embed them mathematically.
+        for cm in chunk_metas:
+            header = await self.enrichment_service.contextualize_chunk(
+                enrichment.summary, cm.text, settings
+            )
+            if header:
+                cm.text = f"[Context: {header}]\n\n{cm.text}"
+
         chunks = [cm.text for cm in chunk_metas]
 
         checksum = hashlib.sha256(source_path.read_bytes()).hexdigest()

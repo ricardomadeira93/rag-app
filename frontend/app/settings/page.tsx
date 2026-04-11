@@ -195,73 +195,34 @@ export default function SettingsPage() {
 
       {activeTab === "General" ? (
         <div className="space-y-4">
-          {aiMode === "cloud" ? (
-            <StatusBanner
-              tone="warning"
-              title="Cloud AI is enabled"
-              body="Prompts and retrieved document excerpts may be sent to external providers."
-            />
-          ) : null}
-
-          <SettingsPanel title="AI mode" description="Choose whether answers run locally or through a cloud provider.">
-            <div className="grid gap-3 md:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => {
-                  updateField("llm_provider", "ollama");
-                  updateField("embedding_provider", "ollama");
-                  updateField("llm_api_key", null);
-                  updateField("embedding_api_key", null);
-                  updateField("llm_model", settings.llm_model || "llama3.1:8b");
-                  updateField("embedding_model", settings.embedding_model || "nomic-embed-text");
-                }}
-                className={aiModeCardClass(aiMode === "local")}
-              >
-                <p className="text-sm font-semibold text-[var(--text-primary)]">Local AI</p>
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">Runs on your device with Ollama.</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  updateField("llm_provider", "openai");
-                  updateField("embedding_provider", "openai");
-                  updateField("llm_model", settings.llm_model || "gpt-4o-mini");
-                  updateField("embedding_model", settings.embedding_model || "text-embedding-3-small");
-                }}
-                className={aiModeCardClass(aiMode === "cloud")}
-              >
-                <p className="text-sm font-semibold text-[var(--text-primary)]">Cloud AI</p>
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">Uses an external provider and needs API credentials.</p>
-              </button>
-            </div>
-          </SettingsPanel>
-
-          {aiMode === "local" ? (
-            <SettingsPanel title="Local runtime" description="Use this to confirm the local model runtime is available.">
-              <OllamaStatus enabled buttonLabel="Check again" />
-            </SettingsPanel>
-          ) : (
-            <SettingsPanel title="Cloud provider" description="Set the provider and credentials used for answers.">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">Provider</span>
-                  <select
-                    value={settings.llm_provider}
-                    onChange={(event) => updateField("llm_provider", event.target.value as Settings["llm_provider"])}
-                    className="input"
-                  >
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                  </select>
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">Model</span>
-                  <input
-                    value={settings.llm_model}
-                    onChange={(event) => updateField("llm_model", event.target.value)}
-                    className="input"
-                  />
-                </label>
+          <SettingsPanel title="Primary AI Model" description="The main brain used for complex questions and analytical reasoning.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[var(--text-primary)]">Provider</span>
+                <select
+                  value={settings.llm_provider}
+                  onChange={(event) => updateField("llm_provider", event.target.value as Settings["llm_provider"])}
+                  className="input"
+                >
+                  <option value="ollama">Local (Ollama)</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                </select>
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[var(--text-primary)]">Chat Model</span>
+                <input
+                  list="chat-models"
+                  value={settings.llm_model}
+                  onChange={(event) => updateField("llm_model", event.target.value)}
+                  className="input"
+                  placeholder="e.g. llama3.1:8b"
+                />
+                <datalist id="chat-models">
+                  {settings.recommended_chat_models?.map(m => <option key={m} value={m} />)}
+                </datalist>
+              </label>
+              {settings.llm_provider !== "ollama" ? (
                 <label className="space-y-2 md:col-span-2">
                   <span className="text-sm font-medium text-[var(--text-primary)]">Answer API key</span>
                   <input
@@ -272,9 +233,55 @@ export default function SettingsPage() {
                     className="input"
                   />
                 </label>
+              ) : null}
+            </div>
+            {settings.llm_provider === "ollama" ? (
+              <div className="mt-4 border-t border-[var(--border-soft)] pt-4">
+                <OllamaStatus enabled buttonLabel="Check connection" />
               </div>
-            </SettingsPanel>
-          )}
+            ) : null}
+          </SettingsPanel>
+
+          <SettingsPanel title="Orchestration & Routing" description="Configure automatic model switching and ingestion processing pipelines.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-[var(--text-primary)]">Automatic Mode (Semantic Routing)</span>
+                  <button
+                    type="button"
+                    onClick={() => updateField("semantic_routing_enabled", !settings.semantic_routing_enabled)}
+                    className={`relative inline-flex h-6 w-11 rounded-full border transition-colors ${
+                        settings.semantic_routing_enabled
+                          ? "border-[var(--accent)] bg-[var(--accent)]"
+                          : "border-[var(--border-strong)] bg-[var(--bg-page)]"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-[18px] w-[18px] rounded-full bg-[var(--bg-surface)] transition-transform ${
+                          settings.semantic_routing_enabled ? "translate-x-[21px]" : "translate-x-0.5"
+                        }`}
+                      />
+                  </button>
+                </div>
+                <p className="text-xs leading-5 text-[var(--text-secondary)] mt-1">If enabled, the app instantly reads your questions before answering. Simple requests automatically route to the tiny, cheap Enrichment Model instead of the main brain.</p>
+              </label>
+              
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-[var(--text-primary)]">Fast Enrichment Model</span>
+                <input
+                  list="enrichment-models"
+                  value={settings.enrichment_model ?? ""}
+                  onChange={(event) => updateField("enrichment_model", event.target.value)}
+                  className="input"
+                  placeholder="e.g. llama3.2:1b"
+                />
+                <datalist id="enrichment-models">
+                  {settings.recommended_enrichment_models?.map(m => <option key={m} value={m} />)}
+                </datalist>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Used for high-speed background ingestion summaries and Automatic Mode semantic routing.</p>
+              </label>
+            </div>
+          </SettingsPanel>
 
           <SettingsPanel title="Retrieval controls" description="Debug mode reveals retrieval details inside chat.">
             <div className="grid gap-4 md:grid-cols-2">
@@ -335,10 +342,14 @@ export default function SettingsPage() {
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-[var(--text-primary)]">Embedding model</span>
                   <input
+                    list="embedding-models"
                     value={settings.embedding_model}
                     onChange={(event) => updateField("embedding_model", event.target.value)}
                     className="input"
                   />
+                  <datalist id="embedding-models">
+                    {settings.recommended_embedding_models?.map(m => <option key={m} value={m} />)}
+                  </datalist>
                 </label>
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-[var(--text-primary)]">Embedding API key</span>

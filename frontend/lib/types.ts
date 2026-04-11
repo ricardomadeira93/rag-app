@@ -37,6 +37,11 @@ export type Settings = {
   current_embedding_signature: EmbeddingSignature;
   supported_llm_providers: LlmProvider[];
   supported_embedding_providers: EmbeddingProvider[];
+  semantic_routing_enabled: boolean;
+  enrichment_model: string | null;
+  recommended_chat_models: string[];
+  recommended_enrichment_models: string[];
+  recommended_embedding_models: string[];
 };
 
 export type DocumentRecord = {

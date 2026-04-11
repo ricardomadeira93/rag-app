@@ -43,6 +43,8 @@ class PersistedSettings(BaseModel):
     embedding_base_url: Optional[str] = None
     embedding_version: str = "1"
 
+    enrichment_model: str = "llama3.2:3b"
+
     chunk_size: int = Field(default=1200, ge=300, le=4000)
     chunk_overlap: int = Field(default=200, ge=0, le=1500)
     top_k: int = Field(default=4, ge=1, le=12)
@@ -59,6 +61,7 @@ class PersistedSettings(BaseModel):
     tone: ToneLiteral = "balanced"
     response_length: ResponseLengthLiteral = "detailed"
     standing_context: str = ""
+    semantic_routing_enabled: bool = False
 
     reindex_required: bool = False
     created_at: str = Field(default_factory=utc_now_iso)
@@ -104,6 +107,8 @@ class SettingsUpdate(BaseModel):
     embedding_base_url: Optional[str] = None
     embedding_version: Optional[str] = None
 
+    enrichment_model: Optional[str] = None
+
     chunk_size: Optional[int] = Field(default=None, ge=300, le=4000)
     chunk_overlap: Optional[int] = Field(default=None, ge=0, le=1500)
     top_k: Optional[int] = Field(default=None, ge=1, le=12)
@@ -120,6 +125,7 @@ class SettingsUpdate(BaseModel):
     tone: Optional[ToneLiteral] = None
     response_length: Optional[ResponseLengthLiteral] = None
     standing_context: Optional[str] = None
+    semantic_routing_enabled: Optional[bool] = None
 
 
 class SettingsResponse(PersistedSettings):
@@ -127,3 +133,6 @@ class SettingsResponse(PersistedSettings):
     current_embedding_signature: EmbeddingSignature
     supported_llm_providers: list[LLMProviderLiteral]
     supported_embedding_providers: list[EmbeddingProviderLiteral]
+    recommended_chat_models: list[str] = Field(default_factory=lambda: ["llama3.1:8b", "qwen2.5:7b", "mistral-nemo"])
+    recommended_enrichment_models: list[str] = Field(default_factory=lambda: ["llama3.2:3b", "llama3.2:1b", "qwen2.5:1.5b"])
+    recommended_embedding_models: list[str] = Field(default_factory=lambda: ["nomic-embed-text"])

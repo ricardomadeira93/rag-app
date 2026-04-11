@@ -1,4 +1,5 @@
-import { BookOpen } from "lucide-react";
+import { BookOpen, FileText } from "lucide-react";
+import Link from "next/link";
 
 import type { SourceCitation } from "@/lib/types";
 
@@ -8,15 +9,30 @@ type SourceCardProps = {
 
 export function SourceCard({ source }: SourceCardProps) {
   return (
-    <div
+    <Link
+      href={`/documents/${source.document_id}`}
       title={`${source.filename}${source.page != null ? ` page ${source.page}` : ""}`}
-      className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-light)] px-2 py-0.5 text-[10px] text-[var(--accent-text)] transition-colors hover:bg-[var(--accent)] hover:text-white"
+      className="group flex max-w-[260px] items-center gap-2.5 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-3 py-2.5 text-[12px] shadow-sm transition-all hover:-translate-y-0.5 hover:border-[var(--accent)] hover:shadow-md"
     >
-      <BookOpen className="h-2.5 w-2.5" />
-      <span className="max-w-[220px] truncate">
-        {source.filename}
-        {source.page != null ? ` p.${source.page}` : ""}
-      </span>
-    </div>
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-light)] text-[var(--accent)] transition-colors group-hover:bg-[var(--accent)] group-hover:text-white">
+        <FileText className="h-3.5 w-3.5" />
+      </div>
+
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate font-medium text-[var(--text-primary)]">
+          {source.filename}
+        </span>
+        {source.page != null ? (
+          <span className="mt-0.5 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+            <BookOpen className="h-[10px] w-[10px] opacity-70" />
+            Page {source.page}
+          </span>
+        ) : (
+          <span className="mt-0.5 text-[10px] font-medium tracking-wider text-[var(--text-muted)]">
+            View source →
+          </span>
+        )}
+      </div>
+    </Link>
   );
 }

@@ -50,22 +50,20 @@ class EnrichmentService:
             logger.warning("fallback used: empty document text")
             return self._fallback(clean_text)
 
-        excerpt = clean_text[:12000]
-        prompt = self._build_prompt(excerpt)
         active_settings = settings or self._resolve_settings()
+        excerpt = self._build_representative_excerpt(clean_text)
+        prompt = self._build_prompt(excerpt)
 
         try:
-            provider = build_llm_provider(active_settings, self.env)
-            response_text = await self._collect_response(
-                provider.stream_chat(
-                    [
-                        ChatMessage(role="system", content=SYSTEM_PROMPT),
-                        ChatMessage(role="user", content=prompt),
-                    ]
-                )
+            provider = build_llm_provider(active_settings, self.env, use_enrichment_model=True)
+            response_text = await provider.generate_json(
+                [
+                    ChatMessage(role="system", content=SYSTEM_PROMPT),
+                    ChatMessage(role="user", content=prompt),
+                ]
             )
             enrichment = self._parse_response(response_text)
-            logger.info("enrichment completed")
+            logger.info("enrichment completed using structured json")
             return enrichment
         except Exception as exc:
             logger.warning("fallback used: enrichment failed with %s", exc)
@@ -76,11 +74,58 @@ class EnrichmentService:
             return self.settings_service.get_settings()
         return PersistedSettings()
 
-    async def _collect_response(self, stream: Any) -> str:
-        parts: list[str] = []
-        async for token in stream:
-            parts.append(token)
-        return "".join(parts).strip()
+    async def contextualize_chunk(self, document_summary: str, chunk_text: str, settings: PersistedSettings | None = None) -> str:
+        prompt = (
+            "You are generating a context header for a text chunk to improve search retrieval.\n"
+            "Return JSON only.\n"
+            "Use this exact shape:\n"
+            "{\n"
+            '  "context_header": "Write a 1-sentence explanation of what this chunk is discussing, using the global summary."\n'
+            "}\n\n"
+            f"Global Document Summary:\n{document_summary}\n\n"
+            f"Chunk Text:\n{chunk_text}"
+        )
+        active_settings = settings or self._resolve_settings()
+        
+        try:
+            provider = build_llm_provider(active_settings, self.env, use_enrichment_model=True)
+            response_text = await provider.generate_json(
+                [
+                    ChatMessage(role="system", content=SYSTEM_PROMPT),
+                    ChatMessage(role="user", content=prompt),
+                ]
+            )
+            candidate = response_text.strip()
+            if candidate.startswith("```"):
+                candidate = candidate.strip("`")
+                if candidate.lower().startswith("json"):
+                    candidate = candidate[4:].strip()
+
+            start = candidate.find("{")
+            end = candidate.rfind("}")
+            if start != -1 and end != -1 and start <= end:
+                parsed = json.loads(candidate[start : end + 1])
+                return parsed.get("context_header", "").strip()
+        except Exception as exc:
+            logger.warning("chunk contextualization failed: %s", exc)
+            
+        return ""
+
+    def _build_representative_excerpt(self, text: str) -> str:
+        # Representative Sampling: Grabs 4k from start, 4k from middle, 4k from end
+        max_chars = 12000
+        if len(text) <= max_chars:
+            return text
+            
+        chunk_size = max_chars // 3
+        start_chunk = text[:chunk_size]
+        end_chunk = text[-chunk_size:]
+        
+        middle_index = len(text) // 2
+        half_chunk = chunk_size // 2
+        middle_chunk = text[middle_index - half_chunk : middle_index + half_chunk]
+        
+        return f"{start_chunk}\n\n...[content skipped]...\n\n{middle_chunk}\n\n...[content skipped]...\n\n{end_chunk}"
 
     def _build_prompt(self, text: str) -> str:
         return (
@@ -107,20 +152,25 @@ class EnrichmentService:
 
     def _parse_response(self, payload: str) -> DocumentEnrichment:
         candidate = payload.strip()
+        
+        # Strip potential markdown fences if model ignored formatting
         if candidate.startswith("```"):
             candidate = candidate.strip("`")
-            if "\n" in candidate:
-                candidate = candidate.split("\n", 1)[1]
-        if candidate.endswith("```"):
-            candidate = candidate[:-3].strip()
+            if candidate.lower().startswith("json"):
+                candidate = candidate[4:].strip()
 
+        # Find the outermost JSON object braces
         start = candidate.find("{")
         end = candidate.rfind("}")
+        
         if start == -1 or end == -1 or end < start:
-            raise ValueError("No JSON object found in enrichment response")
+            raise ValueError(f"No JSON object found in response payload: {payload[:100]}")
 
-        parsed = json.loads(candidate[start : end + 1])
-        return DocumentEnrichment.model_validate(parsed)
+        try:
+            parsed = json.loads(candidate[start : end + 1])
+            return DocumentEnrichment.model_validate(parsed)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON produced by model: {e}")
 
     def _fallback(self, text: str) -> DocumentEnrichment:
         summary = self._fallback_summary(text)

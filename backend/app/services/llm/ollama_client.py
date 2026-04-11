@@ -28,11 +28,15 @@ class OllamaClient:
             return []
         return status["models"]
 
-    async def generate(self, prompt: str, model: str) -> str:
+    async def generate(self, prompt: str, model: str, format: str | dict | None = None) -> str:
+        payload = {"model": model, "prompt": prompt, "stream": False}
+        if format is not None:
+            payload["format"] = format
+
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
                 f"{self.base_url}/api/generate",
-                json={"model": model, "prompt": prompt, "stream": False},
+                json=payload,
             )
             response.raise_for_status()
             payload = response.json()

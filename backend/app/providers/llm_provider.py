@@ -15,6 +15,9 @@ class LLMProvider(Protocol):
     async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[str]:
         ...
 
+    async def generate_json(self, messages: list[ChatMessage]) -> str:
+        ...
+
 
 @dataclass
 class LiteLLMChatProvider:
@@ -41,6 +44,23 @@ class LiteLLMChatProvider:
             if content:
                 yield content
 
+    async def generate_json(self, messages: list[ChatMessage]) -> str:
+        response = await acompletion(
+            model=_resolve_model_name(self.provider, self.model),
+            messages=[message.model_dump() for message in messages],
+            api_key=self.api_key,
+            api_base=self.base_url,
+            response_format={"type": "json_object"},
+            stream=False,
+        )
+
+        choices = _read(response, "choices") or []
+        if not choices:
+            return ""
+            
+        message = _read(choices[0], "message") or {}
+        return _read(message, "content") or ""
+
 
 @dataclass
 class OllamaChatProvider:
@@ -53,8 +73,13 @@ class OllamaChatProvider:
         async for token in client.stream_generate(prompt=prompt, model=self.model):
             yield token
 
+    async def generate_json(self, messages: list[ChatMessage]) -> str:
+        prompt = _build_prompt(messages)
+        client = build_ollama_client(self.base_url)
+        return await client.generate(prompt=prompt, model=self.model, format="json")
 
-def build_llm_provider(settings: PersistedSettings, env: EnvironmentSettings) -> LLMProvider:
+
+def build_llm_provider(settings: PersistedSettings, env: EnvironmentSettings, use_enrichment_model: bool = False) -> LLMProvider:
     if settings.llm_provider in {"openai", "anthropic"} and not settings.llm_api_key:
         raise ValueError(f"{settings.llm_provider} requires an API key")
 
@@ -62,12 +87,14 @@ def build_llm_provider(settings: PersistedSettings, env: EnvironmentSettings) ->
     if settings.llm_provider == "ollama" and not base_url:
         base_url = env.ollama_base_url
 
+    model_to_use = settings.enrichment_model if use_enrichment_model else settings.llm_model
+
     if settings.llm_provider == "ollama":
-        return OllamaChatProvider(model=settings.llm_model, base_url=base_url or env.ollama_base_url)
+        return OllamaChatProvider(model=model_to_use, base_url=base_url or env.ollama_base_url)
 
     return LiteLLMChatProvider(
         provider=settings.llm_provider,
-        model=settings.llm_model,
+        model=model_to_use,
         api_key=settings.llm_api_key,
         base_url=base_url,
     )
