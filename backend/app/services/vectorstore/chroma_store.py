@@ -42,6 +42,9 @@ class ChromaVectorStore:
                     "file_type": document.file_type,
                     "file_type_normalized": document.file_type.strip().lower(),
                     "document_type": document.document_type or "",
+                    "source_type": document.source_type,
+                    "source_connector": document.source_connector,
+                    "doc_type": document.doc_type,
                     "summary": document.summary or "",
                     "topics": json.dumps(document.topics),
                     "created_at": document.created_at,
@@ -122,6 +125,8 @@ class ChromaVectorStore:
                     page=page,
                     offset=int(metadata.get("offset", 0)),
                     created_at=str(metadata.get("created_at")) if metadata.get("created_at") else None,
+                    source_type=str(metadata.get("source_type", "upload")),
+                    doc_type=str(metadata.get("doc_type", "file")),
                 )
             )
         return sources

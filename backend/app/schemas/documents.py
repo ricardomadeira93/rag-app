@@ -22,12 +22,16 @@ class DocumentRecord(BaseModel):
     source_path: str
     extracted_text_path: Optional[str] = None
     chunk_count: int = 0
+    source_type: str = "upload" # generic file upload default
+    source_connector: str = "manual" # manual or live
+    doc_type: str = "file" # generic classification
     embedding_provider: str
     embedding_model: str
     embedding_version: str
     summary: str | None = None
     document_type: str | None = None
     topics: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)  # user-defined tags for organization
     # Status tracking — defaults to "indexed" so pre-existing records need no migration
     status: DocumentStatus = "indexed"
     indexed_at: str | None = None

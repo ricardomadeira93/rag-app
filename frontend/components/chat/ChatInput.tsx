@@ -59,7 +59,7 @@ export function ChatInput({
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-4">
+    <div className="pointer-events-none fixed bottom-0 right-0 left-0 md:left-[220px] z-20 flex justify-center px-4 pb-4">
       <div className="pointer-events-auto w-full max-w-[680px] rounded-t-2xl border-t border-[var(--border-soft)] bg-[var(--bg-page)] px-4 py-3">
         <div className="overflow-hidden rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] shadow-[var(--shadow-soft)]">
           <AttachmentChips documents={attachedDocuments} onRemove={onRemoveAttachment} />

@@ -14,7 +14,7 @@ import {
   type SortOption,
   type StatusFilter,
 } from "@/lib/documents";
-import { deleteDocument, fetchDocuments, fetchSettings, reindexDocuments } from "@/lib/api";
+import { deleteDocument, fetchDocuments, fetchSettings, reindexDocuments, fetchAllTags, updateDocumentTags } from "@/lib/api";
 import type { DocumentRecord, Settings } from "@/lib/types";
 
 const pageTransition = {
@@ -40,6 +40,7 @@ export default function DocumentsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [message, setMessage] = useState<string | null>(null);
+  const [allTags, setAllTags] = useState<string[]>([]);
 
   useEffect(() => {
     void load();
@@ -67,9 +68,14 @@ export default function DocumentsPage() {
 
   async function load() {
     try {
-      const [nextDocuments, nextSettings] = await Promise.all([fetchDocuments(), fetchSettings()]);
+      const [nextDocuments, nextSettings, tags] = await Promise.all([
+        fetchDocuments(),
+        fetchSettings(),
+        fetchAllTags().catch(() => [])
+      ]);
       setDocuments(nextDocuments);
       setSettings(nextSettings);
+      setAllTags(tags);
       setMessage(null);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Failed to load documents");
@@ -102,6 +108,22 @@ export default function DocumentsPage() {
       setMessage(reason instanceof Error ? reason.message : "Re-index failed");
     } finally {
       setReindexing(false);
+    }
+  }
+
+  async function handleUpdateTags(documentId: string, newTags: string[]) {
+    try {
+      // Optimistic update
+      setDocuments(current =>
+        current.map(doc => doc.id === documentId ? { ...doc, tags: newTags } : doc)
+      );
+      
+      // Merge unique new tags into allTags
+      setAllTags(current => Array.from(new Set([...current, ...newTags])).sort());
+      
+      await updateDocumentTags(documentId, newTags);
+    } catch {
+      // Ignore
     }
   }
 
@@ -244,10 +266,12 @@ export default function DocumentsPage() {
               <DocumentItem
                 key={document.id}
                 document={document}
+                allTags={allTags}
                 deleting={deletingId === document.id}
                 expanded={expandedId === document.id}
                 onToggle={(id) => setExpandedId((current) => (current === id ? null : id))}
                 onDelete={(id) => void handleDelete(id)}
+                onUpdateTags={handleUpdateTags}
               />
             ))
           )}

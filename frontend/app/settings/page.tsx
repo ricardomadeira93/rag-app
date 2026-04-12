@@ -9,11 +9,12 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { StatusBanner } from "@/components/status-banner";
 import { StoragePanel } from "@/components/StoragePanel";
 import { useToast } from "@/components/toast-provider";
-import { deleteDocument, fetchDocuments, fetchSettings, reindexDocuments, saveSettings } from "@/lib/api";
+import { deleteDocument, fetchDocuments, fetchSettings, reindexDocuments, saveSettings, fetchMemories, deleteMemory } from "@/lib/api";
+import type { MemoryItem } from "@/lib/api";
 import type { Settings } from "@/lib/types";
 import { applyUiTheme } from "@/lib/ui-theme";
 
-const tabs = ["General", "Advanced", "Data", "About"] as const;
+const tabs = ["General", "Advanced", "Memory", "Data", "About"] as const;
 type Tab = (typeof tabs)[number];
 
 export default function SettingsPage() {
@@ -26,6 +27,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<"reset-knowledge" | "reset-onboarding" | null>(null);
+  const [memories, setMemories] = useState<MemoryItem[]>([]);
+  const [memoriesLoading, setMemoriesLoading] = useState(false);
 
   useEffect(() => {
     void load();
@@ -41,13 +44,21 @@ export default function SettingsPage() {
 
   async function load() {
     try {
-      const [nextSettings, documents] = await Promise.all([fetchSettings(), fetchDocuments()]);
+      setMemoriesLoading(true);
+      const [nextSettings, documents, fetchedMemories] = await Promise.all([
+        fetchSettings(),
+        fetchDocuments(),
+        fetchMemories().catch(() => []) // gracefully handle if db hasn't init'd
+      ]);
       setSettings(nextSettings);
       setDocumentCount(documents.length);
       setChunkCount(documents.reduce((count, document) => count + document.chunk_count, 0));
+      setMemories(fetchedMemories);
       setMessage(null);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Failed to load settings");
+    } finally {
+      setMemoriesLoading(false);
     }
   }
 
@@ -429,6 +440,16 @@ export default function SettingsPage() {
                   className="input"
                 />
               </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[var(--text-primary)]">Your name</span>
+                <input
+                  value={settings.user_name ?? ""}
+                  onChange={(event) => updateField("user_name", event.target.value)}
+                  className="input"
+                  placeholder="e.g. Ricardo"
+                />
+                <p className="text-xs text-[var(--text-muted)]">How the AI should address you.</p>
+              </label>
               <label className="space-y-2 md:col-span-2">
                 <span className="text-sm font-medium text-[var(--text-primary)]">Workspace description</span>
                 <textarea
@@ -536,6 +557,49 @@ export default function SettingsPage() {
               >
                 Reset knowledge base
               </button>
+            </div>
+          </SettingsPanel>
+        </div>
+      ) : null}
+
+      {activeTab === "Memory" ? (
+        <div className="space-y-4">
+          <SettingsPanel title="AI Memory" description="Facts the AI has learned about you across conversations. Delete any memory you want it to forget.">
+            <div className="space-y-2">
+              {memoriesLoading ? (
+                <p className="text-[13px] text-[var(--text-muted)]">Loading memories...</p>
+              ) : memories.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[var(--border-soft)] bg-[var(--bg-subtle)] p-6 text-center">
+                  <p className="text-[13px] text-[var(--text-muted)]">No memories yet</p>
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">The AI will learn facts about you as you chat. They will appear here.</p>
+                </div>
+              ) : (
+                memories.map((memory) => (
+                  <div key={memory.id} className="flex items-start justify-between gap-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] text-[var(--text-primary)]">{memory.fact}</p>
+                      <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                        Learned {new Date(memory.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await deleteMemory(memory.id);
+                          setMemories((prev) => prev.filter((m) => m.id !== memory.id));
+                          pushToast({ tone: "success", title: "Memory removed" });
+                        } catch {
+                          pushToast({ tone: "error", title: "Failed to remove memory" });
+                        }
+                      }}
+                      className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-[var(--text-muted)] transition-colors hover:bg-red-50 hover:text-[var(--danger)] dark:hover:bg-red-950"
+                    >
+                      Forget
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </SettingsPanel>
         </div>

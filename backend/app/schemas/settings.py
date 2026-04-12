@@ -56,6 +56,7 @@ class PersistedSettings(BaseModel):
     onboarding_complete: bool = False
     workspace_name: str = ""
     workspace_description: str = ""
+    user_name: str = ""
     user_role: str = ""
     language: str = "English"
     tone: ToneLiteral = "balanced"
@@ -120,6 +121,7 @@ class SettingsUpdate(BaseModel):
     onboarding_complete: Optional[bool] = None
     workspace_name: Optional[str] = None
     workspace_description: Optional[str] = None
+    user_name: Optional[str] = None
     user_role: Optional[str] = None
     language: Optional[str] = None
     tone: Optional[ToneLiteral] = None

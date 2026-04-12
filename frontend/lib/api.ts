@@ -72,6 +72,32 @@ export async function deleteDocument(documentId: string): Promise<DeleteDocument
   return readJson<DeleteDocumentResponse>(response);
 }
 
+export async function fetchSources(): Promise<any[]> {
+  const response = await fetch(`${API_URL}/sources`, { cache: "no-store" });
+  return readJson<any[]>(response);
+}
+
+export async function fetchAllTags(): Promise<string[]> {
+  const response = await fetch(`${API_URL}/documents/tags`, { cache: "no-store" });
+  return readJson<string[]>(response);
+}
+
+export async function updateDocumentTags(documentId: string, tags: string[]): Promise<DocumentRecord> {
+  const response = await fetch(`${API_URL}/documents/${documentId}/tags`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tags }),
+  });
+  return readJson<DocumentRecord>(response);
+}
+
+export async function connectSource(sourceId: string): Promise<{ auth_url: string }> {
+  const response = await fetch(`${API_URL}/sources/${sourceId}/connect`, {
+    method: "POST"
+  });
+  return readJson<{ auth_url: string }>(response);
+}
+
 export async function updateDocumentStatus(
   documentId: string,
   status: DocumentRecord["status"],
@@ -114,6 +140,7 @@ export async function streamChat(
   handlers: {
     onToken: (token: string) => void;
     onSources: (sources: SourceCitation[]) => void;
+    onMeta?: (meta: { confidence: "high"|"medium"|"low"|"none", answer_type: string }) => void;
     onScoping?: (scoping: ChatScopingInfo) => void;
     onDebug?: (debug: RetrievalDebugInfo) => void;
     onError: (message: string) => void;
@@ -177,6 +204,9 @@ export async function streamChat(
       if (event === "scoping") {
         handlers.onScoping?.(payload as ChatScopingInfo);
       }
+      if (event === "meta") {
+        handlers.onMeta?.(payload as any);
+      }
       if (event === "debug") {
         handlers.onDebug?.(payload as RetrievalDebugInfo);
       }
@@ -192,6 +222,11 @@ export async function streamChat(
 export async function fetchConversations(): Promise<Conversation[]> {
   const response = await fetch(`${API_URL}/conversations`, { cache: "no-store" });
   return readJson<Conversation[]>(response);
+}
+
+export async function fetchConversation(conversationId: string): Promise<Conversation> {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}`, { cache: "no-store" });
+  return readJson<Conversation>(response);
 }
 
 export async function createConversation(title?: string): Promise<Conversation> {
@@ -212,6 +247,63 @@ export async function fetchMessages(conversationId: string): Promise<PersistedMe
 
 export async function deleteConversation(conversationId: string): Promise<void> {
   const response = await fetch(`${API_URL}/conversations/${conversationId}`, {
+    method: "DELETE",
+  });
+  await readJson(response);
+}
+
+export async function rateMessage(messageId: string, rating: 1 | -1): Promise<void> {
+  const response = await fetch(`${API_URL}/messages/${messageId}/rate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rating }),
+  });
+  await readJson(response);
+}
+
+export async function renameConversation(conversationId: string, title: string): Promise<Conversation> {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  return readJson<Conversation>(response);
+}
+
+export async function togglePin(conversationId: string): Promise<Conversation> {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/pin`, {
+    method: "POST",
+  });
+  return readJson<Conversation>(response);
+}
+
+export async function searchConversation(conversationId: string, query: string): Promise<PersistedMessage[]> {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/search?q=${encodeURIComponent(query)}`,
+    { cache: "no-store" },
+  );
+  return readJson<PersistedMessage[]>(response);
+}
+
+
+
+// ── Memories ──────────────────────────────────────────────────────────────────
+
+export type MemoryItem = {
+  id: string;
+  fact: string;
+  source_conversation_id: string | null;
+  active: boolean;
+  created_at: string;
+};
+
+export async function fetchMemories(): Promise<MemoryItem[]> {
+  const response = await fetch(`${API_URL}/memories`, { cache: "no-store" });
+  return readJson<MemoryItem[]>(response);
+}
+
+export async function deleteMemory(memoryId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/memories/${memoryId}`, {
     method: "DELETE",
   });
   await readJson(response);

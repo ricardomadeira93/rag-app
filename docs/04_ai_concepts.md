@@ -71,3 +71,28 @@ The LLM now acts like a brilliant student taking an open-book test. It reads you
 **Analogy:** Imagine hiring an investigator to look through a library of 10,000 books to find information on "Apples". The investigator finds 50 books that mention Apples. But you only gave the investigator a briefcase that can hold exactly 5 books. The investigator takes the "Top 5" best books, leaves the other 45 behind, and returns to you. 
 
 **In this project:** If you upload 20 documents about "Python", they might get chopped up into 100 chunks. If you search "Python" while your app's `Top-K` setting is only `4`, the AI will exclusively read the absolute 4 most mathematically relevant chunks and then stop. If the answer you actually wanted was located in the 5th chunk, the AI fails because it wasn't allowed to read that far. Bumping your "Top-K" slider higher gives the AI a bigger briefcase to carry more information context back to you!
+
+---
+
+## 6. Hybrid Search & RRF (Reciprocal Rank Fusion)
+
+**What it means:** Pure math (Embeddings) is great for *meaning* but terrible at finding exact jargon, serial numbers, or names. Hybrid Search pairs the Math search with a classic Keyword search (BM25), then uses a formula (RRF) to blend the two lists fairly.
+
+**Analogy:** You want to buy a "sturdy red truck". You ask two helpers:
+1. Helper A uses a dictionary of vibes and looks for anything mentioning "durable", "crimson", or "pickup". (Semantic Vector)
+2. Helper B strictly uses a magnifying glass and only finds cars with the exact sticker "Sturdy Red Truck". (BM25 Keyword)
+Helper A brings back a strong list of similar trucks. Helper B brings back one exact match. You combine the lists (RRF) and look at those final top vehicles to make a decision.
+
+**In this project:** Our pipeline natively executes a ChromaDB semantic search and a fast `rank_bm25` lexical search perfectly in parallel. We calculate an RRF score for both lists and return a unified `RetrievalResult` to guarantee we don't miss nuanced questions or strict identifier lookups.
+
+---
+
+## 7. Intelligent Prompt Routing
+
+**What it means:** Not every question requires reading the entire document library. If you just say "Hello," or "Forget what I just told you," the AI doesn't need to mathematically scan documents. Using fast Regex or lightweight AI routers, the system classifies *what* you're asking before executing heavy operations.
+
+**Analogy:** At a hospital triage desk, a nurse categorizes patients. A patient with a paper cut goes to one room, and a patient actively having a heart attack goes to the ER. Prompt routing performs triage on your chat message to save backend processing time and return drastically faster answers.
+
+**In this project:** We classify chat messages using Regex rules (e.g., `answerType: factual`, `procedural`, `workspace`). The UI receives these tags during the stream and updates visual badges for you to contextualize *how* the AI understands your question.
+
+---

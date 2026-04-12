@@ -16,6 +16,7 @@ async def init_db(db_path: Path) -> None:
             CREATE TABLE IF NOT EXISTS conversations (
                 id       TEXT PRIMARY KEY,
                 title    TEXT NOT NULL,
+                pinned   INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -27,8 +28,28 @@ async def init_db(db_path: Path) -> None:
                 role            TEXT NOT NULL,
                 content         TEXT NOT NULL,
                 sources         TEXT NOT NULL DEFAULT '[]',
+                rating          INTEGER DEFAULT NULL,
                 created_at      TEXT NOT NULL
             )
+        """)
+        # --- Safe column migrations for existing databases ---
+        # SQLite ignores ALTER TABLE ADD COLUMN if it already exists (wrapped in try/except)
+        for migration in [
+            "ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE messages ADD COLUMN rating INTEGER DEFAULT NULL",
+        ]:
+            try:
+                await db.execute(migration)
+            except Exception:
+                pass  # Column already exists
+        # Index for full-text search within conversations
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_messages_conversation
+            ON messages(conversation_id, created_at)
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_messages_content
+            ON messages(content)
         """)
         await db.commit()
 

@@ -8,11 +8,13 @@ from app.schemas.chat import ChatFilters, ChatScopingInfo, RetrievalDebugChunk, 
 from app.schemas.settings import PersistedSettings
 from app.services.embeddings.service import EmbeddingService
 from app.services.vectorstore.chroma_store import ChromaVectorStore
+from app.services.vectorstore.bm25_store import BM25Store
 
 
 @dataclass
 class RetrievalResult:
     sources: list[SourceCitation]
+    confidence: str = "none"
     debug: RetrievalDebugInfo | None = None
     scoping: ChatScopingInfo | None = None
 
@@ -22,9 +24,11 @@ class RetrievalService:
         self,
         embedding_service: EmbeddingService,
         vector_store: ChromaVectorStore,
+        bm25_store: BM25Store,
     ) -> None:
         self.embedding_service = embedding_service
         self.vector_store = vector_store
+        self.bm25_store = bm25_store
 
     async def retrieve(
         self,
@@ -35,12 +39,26 @@ class RetrievalService:
     ) -> RetrievalResult:
         query_embedding = await self.embedding_service.embed_query(settings, query)
         where_filter, understanding = self._build_filters(query, filters)
-        candidates = self.vector_store.query(
+        
+        # 1. Semantic Search
+        semantic_candidates = self.vector_store.query(
             query_embedding=query_embedding,
-            top_k=max(settings.top_k, 10),
+            top_k=max(settings.top_k, 20),
             filters=where_filter,
         )
-        reranked = self._rerank(candidates)
+        
+        # 2. Lexical Search (BM25)
+        lexical_candidates = self.bm25_store.search(
+            query=query,
+            top_k=max(settings.top_k, 20),
+            filters=where_filter,
+        )
+        
+        # 3. Reciprocal Rank Fusion (RRF)
+        fused_candidates = self._rrf(semantic_candidates, lexical_candidates)
+
+        # 4. Rerank and truncate
+        reranked = self._rerank(fused_candidates)
         # Ensure the AI receives an absolute minimum of 8 chunks (unless they configured more)
         # Without this, low UI settings forcibly push slightly-older but highly relevant chunks out of bounds
         actual_top_k = max(settings.top_k, 8)
@@ -72,15 +90,52 @@ class RetrievalService:
             days=filters.days if filters else None,
         )
 
-        return RetrievalResult(sources=selected, debug=debug_payload, scoping=scoping)
+        # Calculate Confidence & Display Percentages
+        confidence = "none"
+        if selected:
+            max_sim = max([s.similarity_score for s in selected])
+            if max_sim >= 0.82:
+                confidence = "high"
+            elif max_sim >= 0.74:
+                confidence = "medium"
+            else:
+                confidence = "low"
+            
+            for source in selected:
+                source.similarity_percent = f"{int(source.similarity_score * 100)}% match"
+
+        return RetrievalResult(sources=selected, confidence=confidence, debug=debug_payload, scoping=scoping)
+
+    def _rrf(self, semantic: list[SourceCitation], lexical: list[SourceCitation], k: int = 60) -> list[SourceCitation]:
+        # Reciprocal Rank Fusion
+        scores_by_id = {}
+        sources_by_id = {}
+
+        for rank, source in enumerate(semantic):
+            sources_by_id[source.id] = source
+            scores_by_id[source.id] = 1 / (k + rank + 1)
+
+        for rank, source in enumerate(lexical):
+            if source.id not in sources_by_id:
+                sources_by_id[source.id] = source
+                scores_by_id[source.id] = 0
+            scores_by_id[source.id] += 1 / (k + rank + 1)
+
+        fused = []
+        for id_, score in scores_by_id.items():
+            source = sources_by_id[id_].model_copy(update={"score": score})
+            fused.append(source)
+
+        fused.sort(key=lambda s: s.score, reverse=True)
+        return fused
 
     def _rerank(self, sources: list[SourceCitation]) -> list[SourceCitation]:
         if not sources:
             return []
 
         timestamps = [self._to_timestamp(source.created_at) for source in sources]
-        min_timestamp = min(timestamps)
-        max_timestamp = max(timestamps)
+        min_timestamp = min(timestamps, default=0.0)
+        max_timestamp = max(timestamps, default=0.0)
         span = max(max_timestamp - min_timestamp, 1.0)
 
         reranked: list[SourceCitation] = []

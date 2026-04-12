@@ -8,6 +8,10 @@ class ChatMessage(BaseModel):
     content: str = Field(min_length=1)
 
 
+class MetaPayload(BaseModel):
+    confidence: Literal["high", "medium", "low", "none"]
+    answer_type: str
+
 class SourceCitation(BaseModel):
     id: str
     document_id: str
@@ -16,10 +20,13 @@ class SourceCitation(BaseModel):
     chunk_text: str = Field(default="", exclude=True)
     score: float
     similarity_score: float = 0.0
+    similarity_percent: str = ""
     chunk_index: int
     page: int | None = None    # 1-based page number for PDFs; null for other file types
     offset: int = 0            # character offset of the chunk start in the source text
     created_at: str | None = None
+    source_type: str = "upload"
+    doc_type: str = "file"
 
 
 class ChatFilters(BaseModel):

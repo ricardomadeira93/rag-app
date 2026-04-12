@@ -6,24 +6,41 @@ import {
   LayoutDashboard,
   Library,
   MessageSquare,
+  Pin,
+  Plug,
   Plus,
   Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { fetchConversations, fetchSettings } from "@/lib/api";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ConversationContextMenu } from "@/components/chat/ConversationContextMenu";
+import {
+  fetchConversations,
+  fetchSettings,
+  deleteConversation,
+  renameConversation,
+  togglePin,
+  fetchSources,
+} from "@/lib/api";
 import type { Conversation } from "@/lib/types";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat", label: "Chats", icon: MessageSquare },
   { href: "/documents", label: "Documents", icon: Library },
+  { href: "/sources", label: "Sources", icon: Plug },
 ] as const;
 
 const transition = { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] } as const;
+
+type ContextMenuState = {
+  conversationId: string;
+  position: { x: number; y: number };
+} | null;
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -31,6 +48,10 @@ export function Sidebar() {
   const [workspaceName, setWorkspaceName] = useState("Local RAG");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chatsOpen, setChatsOpen] = useState(true);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [activeSourcesCount, setActiveSourcesCount] = useState(0);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
 
   useEffect(() => {
     void fetchSettings()
@@ -39,10 +60,99 @@ export function Sidebar() {
     void fetchConversations()
       .then((items) => setConversations(items))
       .catch(() => setConversations([]));
+    void fetchSources()
+      .then((items) => setActiveSourcesCount(items.filter(i => i.status === "syncing" || i.status === "connected").length))
+      .catch(() => setActiveSourcesCount(0));
   }, []);
 
-  const recentConversations = useMemo(() => conversations.slice(0, 6), [conversations]);
+  const pinnedConversations = useMemo(
+    () => conversations.filter((c) => c.pinned),
+    [conversations],
+  );
+  const recentConversations = useMemo(
+    () => conversations.filter((c) => !c.pinned).slice(0, 12),
+    [conversations],
+  );
   const initial = workspaceName.trim().charAt(0).toUpperCase() || "L";
+
+  async function handleDeleteChat() {
+    if (!confirmDeleteId) return;
+    setDeleting(true);
+    try {
+      await deleteConversation(confirmDeleteId);
+      setConversations((prev) => prev.filter((c) => c.id !== confirmDeleteId));
+      if (pathname === `/chat/${confirmDeleteId}`) {
+        router.push("/chat");
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteId(null);
+    }
+  }
+
+  const handleRename = useCallback(async (id: string, newTitle: string) => {
+    try {
+      const updated = await renameConversation(id, newTitle);
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, title: updated.title } : c)),
+      );
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  const handleTogglePin = useCallback(async (id: string) => {
+    try {
+      const updated = await togglePin(id);
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, pinned: updated.pinned } : c)),
+      );
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  function handleContextMenu(e: React.MouseEvent, conversationId: string) {
+    e.preventDefault();
+    setContextMenu({ conversationId, position: { x: e.clientX, y: e.clientY } });
+  }
+
+  const contextConversation = contextMenu
+    ? conversations.find((c) => c.id === contextMenu.conversationId)
+    : null;
+
+  const confirmConversation = conversations.find((c) => c.id === confirmDeleteId) ?? null;
+
+  function renderConversationItem(conversation: Conversation, index: number) {
+    const isActive = pathname === `/chat/${conversation.id}`;
+    return (
+      <motion.div
+        key={conversation.id}
+        initial={{ x: -8, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ ...transition, delay: index * 0.03 }}
+        className="group relative"
+        onContextMenu={(e) => handleContextMenu(e, conversation.id)}
+      >
+        <Link
+          href={`/chat/${conversation.id}`}
+          title={conversation.title}
+          className={`ml-7 flex h-7 items-center justify-between rounded-lg px-2 text-[12px] transition-colors pr-6 ${
+            isActive
+              ? "bg-[var(--bg-active)] text-[var(--text-primary)]"
+              : "text-[var(--text-muted)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-secondary)]"
+          }`}
+        >
+          <span className="truncate">{conversation.title}</span>
+          {conversation.pinned ? (
+            <Pin className="ml-1 h-2.5 w-2.5 shrink-0 text-[var(--accent)] opacity-60" />
+          ) : null}
+        </Link>
+      </motion.div>
+    );
+  }
 
   return (
     <aside className="hidden min-h-screen w-[220px] shrink-0 border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] md:flex md:flex-col">
@@ -77,8 +187,15 @@ export function Sidebar() {
             const Icon = item.icon;
             const content = (
               <>
-                <Icon className="h-[15px] w-[15px]" />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-[10px]">
+                  <Icon className="h-[15px] w-[15px]" />
+                  <span>{item.label}</span>
+                </div>
+                {item.href === "/sources" && activeSourcesCount > 0 && (
+                  <div className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[9px] font-medium text-white">
+                    {activeSourcesCount}
+                  </div>
+                )}
               </>
             );
 
@@ -108,23 +225,27 @@ export function Sidebar() {
                         transition={transition}
                         className="overflow-hidden"
                       >
-                        <div className="mt-1 space-y-1">
-                          {recentConversations.map((conversation, index) => (
-                            <motion.div
-                              key={conversation.id}
-                              initial={{ x: -8, opacity: 0 }}
-                              animate={{ x: 0, opacity: 1 }}
-                              transition={{ ...transition, delay: index * 0.03 }}
-                            >
-                              <Link
-                                href={`/chat/${conversation.id}`}
-                                title={conversation.title}
-                                className="ml-7 flex h-7 items-center rounded-lg px-2 text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-secondary)]"
-                              >
-                                <span className="truncate">{conversation.title.slice(0, 22)}</span>
-                              </Link>
-                            </motion.div>
-                          ))}
+                        <div className="mt-1 space-y-0.5">
+                          {/* Pinned conversations */}
+                          {pinnedConversations.length > 0 ? (
+                            <>
+                              <p className="ml-8 mt-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                                Pinned
+                              </p>
+                              {pinnedConversations.map((c, i) => renderConversationItem(c, i))}
+                              {recentConversations.length > 0 ? (
+                                <p className="ml-8 mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                                  Recent
+                                </p>
+                              ) : null}
+                            </>
+                          ) : null}
+
+                          {/* Recent conversations */}
+                          {recentConversations.map((c, i) =>
+                            renderConversationItem(c, i + pinnedConversations.length),
+                          )}
+
                           <button
                             type="button"
                             onClick={() => router.push("/chat")}
@@ -141,7 +262,7 @@ export function Sidebar() {
             }
 
             return (
-              <Link key={item.href} href={item.href} className={`sidebar-item ${active ? "sidebar-item-active" : ""}`}>
+              <Link key={item.href} href={item.href} className={`sidebar-item flex justify-between w-[calc(100%-16px)] ${active ? "sidebar-item-active" : ""}`}>
                 {content}
               </Link>
             );
@@ -155,10 +276,6 @@ export function Sidebar() {
             <span>Settings</span>
           </Link>
         </nav>
-
-        <div className="mt-6 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-3 py-3 text-[12px] leading-5 text-[var(--text-muted)]">
-          Reading stays calm in Chat. Source files stay organized in Documents.
-        </div>
 
         <div className="mt-auto pt-4">
           <div className="mb-3 border-t border-[var(--sidebar-border)]" />
@@ -179,6 +296,31 @@ export function Sidebar() {
           </div>
         </div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && contextConversation ? (
+        <ConversationContextMenu
+          conversationId={contextMenu.conversationId}
+          conversationTitle={contextConversation.title}
+          isPinned={contextConversation.pinned}
+          position={contextMenu.position}
+          onRename={(id, title) => void handleRename(id, title)}
+          onTogglePin={(id) => void handleTogglePin(id)}
+          onDelete={(id) => setConfirmDeleteId(id)}
+          onClose={() => setContextMenu(null)}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirmDeleteId)}
+        title="Delete chat?"
+        description={confirmConversation ? `Permanently delete "${confirmConversation.title}"?` : "Permanently delete this chat?"}
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleting}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => void handleDeleteChat()}
+      />
     </aside>
   );
 }

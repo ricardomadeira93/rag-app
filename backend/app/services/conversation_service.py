@@ -24,23 +24,50 @@ class ConversationService:
     async def list_conversations(self) -> list[ConversationSummary]:
         async with get_db(self.db_path) as db:
             cursor = await db.execute(
-                "SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC"
+                "SELECT id, title, pinned, created_at, updated_at "
+                "FROM conversations ORDER BY pinned DESC, updated_at DESC"
             )
             rows = await cursor.fetchall()
-            return [ConversationSummary(**dict(row)) for row in rows]
+            return [
+                ConversationSummary(
+                    id=row["id"],
+                    title=row["title"],
+                    pinned=bool(row["pinned"]),
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                )
+                for row in rows
+            ]
+
+    async def get_conversation(self, conversation_id: str) -> ConversationSummary | None:
+        async with get_db(self.db_path) as db:
+            row = await (await db.execute(
+                "SELECT id, title, pinned, created_at, updated_at FROM conversations WHERE id = ?",
+                (conversation_id,),
+            )).fetchone()
+            if not row:
+                return None
+            return ConversationSummary(
+                id=row["id"],
+                title=row["title"],
+                pinned=bool(row["pinned"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
 
     async def create_conversation(self, title: str | None = None) -> ConversationSummary:
         now = _utc_now()
         record = ConversationSummary(
             id=_new_id(),
             title=title or "New conversation",
+            pinned=False,
             created_at=now,
             updated_at=now,
         )
         async with get_db(self.db_path) as db:
             await db.execute(
-                "INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
-                (record.id, record.title, record.created_at, record.updated_at),
+                "INSERT INTO conversations (id, title, pinned, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                (record.id, record.title, 0, record.created_at, record.updated_at),
             )
             await db.commit()
         return record
@@ -48,7 +75,7 @@ class ConversationService:
     async def get_messages(self, conversation_id: str) -> list[PersistedMessage]:
         async with get_db(self.db_path) as db:
             cursor = await db.execute(
-                "SELECT id, conversation_id, role, content, sources, created_at "
+                "SELECT id, conversation_id, role, content, sources, rating, created_at "
                 "FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
                 (conversation_id,),
             )
@@ -60,6 +87,7 @@ class ConversationService:
                     role=row["role"],
                     content=row["content"],
                     sources=json.loads(row["sources"]),
+                    rating=row["rating"],
                     created_at=row["created_at"],
                 )
                 for row in rows
@@ -93,6 +121,87 @@ class ConversationService:
             )
             await db.commit()
         return record
+
+    async def rename_conversation(self, conversation_id: str, title: str) -> ConversationSummary | None:
+        async with get_db(self.db_path) as db:
+            cursor = await db.execute(
+                "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
+                (title, _utc_now(), conversation_id),
+            )
+            await db.commit()
+            if cursor.rowcount == 0:
+                return None
+            row = await (await db.execute(
+                "SELECT id, title, pinned, created_at, updated_at FROM conversations WHERE id = ?",
+                (conversation_id,),
+            )).fetchone()
+            if not row:
+                return None
+            return ConversationSummary(
+                id=row["id"],
+                title=row["title"],
+                pinned=bool(row["pinned"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+
+    async def toggle_pin(self, conversation_id: str) -> ConversationSummary | None:
+        async with get_db(self.db_path) as db:
+            row = await (await db.execute(
+                "SELECT pinned FROM conversations WHERE id = ?", (conversation_id,)
+            )).fetchone()
+            if not row:
+                return None
+            new_pinned = 0 if row["pinned"] else 1
+            await db.execute(
+                "UPDATE conversations SET pinned = ? WHERE id = ?",
+                (new_pinned, conversation_id),
+            )
+            await db.commit()
+            updated = await (await db.execute(
+                "SELECT id, title, pinned, created_at, updated_at FROM conversations WHERE id = ?",
+                (conversation_id,),
+            )).fetchone()
+            if not updated:
+                return None
+            return ConversationSummary(
+                id=updated["id"],
+                title=updated["title"],
+                pinned=bool(updated["pinned"]),
+                created_at=updated["created_at"],
+                updated_at=updated["updated_at"],
+            )
+
+    async def search_messages(self, conversation_id: str, query: str) -> list[PersistedMessage]:
+        async with get_db(self.db_path) as db:
+            cursor = await db.execute(
+                "SELECT id, conversation_id, role, content, sources, rating, created_at "
+                "FROM messages WHERE conversation_id = ? AND content LIKE ? "
+                "ORDER BY created_at ASC",
+                (conversation_id, f"%{query}%"),
+            )
+            rows = await cursor.fetchall()
+            return [
+                PersistedMessage(
+                    id=row["id"],
+                    conversation_id=row["conversation_id"],
+                    role=row["role"],
+                    content=row["content"],
+                    sources=json.loads(row["sources"]),
+                    rating=row["rating"],
+                    created_at=row["created_at"],
+                )
+                for row in rows
+            ]
+
+    async def rate_message(self, message_id: str, rating: int) -> bool:
+        async with get_db(self.db_path) as db:
+            cursor = await db.execute(
+                "UPDATE messages SET rating = ? WHERE id = ?",
+                (rating, message_id),
+            )
+            await db.commit()
+            return cursor.rowcount > 0
 
     async def update_title(self, conversation_id: str, title: str) -> None:
         async with get_db(self.db_path) as db:

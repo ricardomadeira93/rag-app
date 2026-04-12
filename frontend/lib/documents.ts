@@ -36,7 +36,10 @@ export function normalizeDocumentType(value: string | null | undefined): Exclude
 
 export function fileTypeLabel(value: string | null | undefined): string {
   const normalized = normalizeDocumentType(value);
-  return normalized === "markdown" ? "Text" : normalized.toUpperCase();
+  if (normalized === "markdown") return "Markdown";
+  if (normalized === "pdf") return "PDF";
+  if (normalized === "audio") return "Audio";
+  return "Image";
 }
 
 export function detectDocumentType(file: File): Exclude<DocumentTypeFilter, "all"> {

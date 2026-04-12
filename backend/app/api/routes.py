@@ -14,6 +14,8 @@ from app.schemas.conversations import (
     ConversationSummary,
     CreateConversationRequest,
     PersistedMessage,
+    RateMessageRequest,
+    RenameConversationRequest,
 )
 from app.schemas.documents import (
     DeleteDocumentResponse,
@@ -41,6 +43,8 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+from app.services.vectorstore.bm25_store import BM25Store
+
 @dataclass
 class ServiceContainer:
     settings: SettingsService
@@ -49,6 +53,8 @@ class ServiceContainer:
     chat: ChatService
     conversations: ConversationService
     vector_store: ChromaVectorStore
+    memory: "MemoryService"
+    bm25_store: BM25Store
 
 
 def get_container(request: Request) -> ServiceContainer:
@@ -124,6 +130,14 @@ async def chat(request: Request, payload: ChatRequest) -> StreamingResponse:
             except Exception:
                 pass  # persistence failure must never break the chat response
 
+            # Extract memories asynchronously (non-blocking, best-effort)
+            try:
+                msgs = [{"role": m.role, "content": m.content} for m in payload.messages[-4:]]
+                msgs.append({"role": "assistant", "content": "".join(assistant_tokens)})
+                await container.memory.extract_and_store(msgs, conv_id, settings)
+            except Exception:
+                pass
+
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
@@ -186,6 +200,26 @@ async def delete_document(request: Request, document_id: str) -> DeleteDocumentR
         raise HTTPException(status_code=404, detail="Document not found")
 
     return DeleteDocumentResponse(id=document_id, deleted=True)
+
+
+@router.get("/documents/tags")
+async def list_document_tags(request: Request) -> list[str]:
+    container = get_container(request)
+    return container.documents.list_all_tags()
+
+
+@router.patch("/documents/{document_id}/tags", response_model=DocumentRecord)
+async def update_document_tags(
+    request: Request, document_id: str, payload: dict
+) -> DocumentRecord:
+    container = get_container(request)
+    tags = payload.get("tags", [])
+    if not isinstance(tags, list):
+        raise HTTPException(status_code=400, detail="tags must be an array")
+    updated = container.documents.update_tags(document_id, tags)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return updated
 
 
 @router.post("/reindex", response_model=ReindexResponse)
@@ -262,6 +296,14 @@ async def list_conversations(request: Request) -> list[ConversationSummary]:
     container = get_container(request)
     return await container.conversations.list_conversations()
 
+@router.get("/conversations/{conversation_id}", response_model=ConversationSummary)
+async def get_conversation(request: Request, conversation_id: str) -> ConversationSummary:
+    container = get_container(request)
+    summary = await container.conversations.get_conversation(conversation_id)
+    if not summary:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return summary
+
 
 @router.post("/conversations", response_model=ConversationSummary)
 async def create_conversation(
@@ -296,3 +338,60 @@ async def delete_conversation(request: Request, conversation_id: str) -> dict[st
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return {"deleted": True}
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationSummary)
+async def rename_conversation(
+    request: Request, conversation_id: str, payload: RenameConversationRequest
+) -> ConversationSummary:
+    container = get_container(request)
+    result = await container.conversations.rename_conversation(conversation_id, payload.title)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return result
+
+
+@router.post("/conversations/{conversation_id}/pin", response_model=ConversationSummary)
+async def toggle_pin_conversation(request: Request, conversation_id: str) -> ConversationSummary:
+    container = get_container(request)
+    result = await container.conversations.toggle_pin(conversation_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return result
+
+
+@router.get("/conversations/{conversation_id}/search", response_model=list[PersistedMessage])
+async def search_conversation_messages(
+    request: Request, conversation_id: str, q: str = ""
+) -> list[PersistedMessage]:
+    if not q.strip():
+        raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
+    container = get_container(request)
+    return await container.conversations.search_messages(conversation_id, q.strip())
+
+
+@router.post("/messages/{message_id}/rate")
+async def rate_message(request: Request, message_id: str, payload: RateMessageRequest) -> dict[str, bool]:
+    container = get_container(request)
+    success = await container.conversations.rate_message(message_id, payload.rating)
+    if not success:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"ok": True}
+
+
+# ── Memories ───────────────────────────────────────────────────────────────────
+
+@router.get("/memories")
+async def list_memories(request: Request) -> list[dict]:
+    container = get_container(request)
+    memories = await container.memory.list_memories()
+    return [m.model_dump() for m in memories]
+
+
+@router.delete("/memories/{memory_id}")
+async def deactivate_memory(request: Request, memory_id: str) -> dict[str, bool]:
+    container = get_container(request)
+    success = await container.memory.deactivate_memory(memory_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return {"ok": True}

@@ -27,6 +27,7 @@ export type Settings = {
   onboarding_complete: boolean;
   workspace_name: string;
   workspace_description: string;
+  user_name: string;
   user_role: string;
   language: string;
   tone: "professional" | "balanced" | "casual";
@@ -64,6 +65,8 @@ export type DocumentRecord = {
   indexed_at: string | null;
   error_message: string | null;
   file_size_bytes: number;  // 0 for pre-existing records
+  source_type?: string;     // e.g. "upload", "gmail", "slack", "notion", "github"
+  tags: string[];           // user-defined tags for organization
   created_at: string;
   updated_at: string;
 };
@@ -75,9 +78,11 @@ export type SourceCitation = {
   snippet: string;
   score: number;
   similarity_score: number;
+  similarity_percent?: string;
   chunk_index: number;
   page: number | null;    // 1-based page for PDFs; null for other file types
   offset: number;         // character offset of chunk start in source text
+  source_type?: string;
   created_at: string | null;
 };
 
@@ -115,10 +120,15 @@ export type RetrievalDebugInfo = {
 };
 
 export type ChatMessage = {
+  id?: string;
   role: "user" | "assistant";
   content: string;
   sources?: SourceCitation[];
   debug?: RetrievalDebugInfo | null;
+  confidence?: "high" | "medium" | "low" | "none";
+  answerType?: string;
+  isThinking?: boolean;
+  rating?: number | null;
 };
 
 export type OllamaStatus = {
@@ -162,6 +172,7 @@ export type DiskUsage = {
 export type Conversation = {
   id: string;
   title: string;
+  pinned: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -172,5 +183,6 @@ export type PersistedMessage = {
   role: "user" | "assistant";
   content: string;
   sources: SourceCitation[];
+  rating: number | null;
   created_at: string;
 };

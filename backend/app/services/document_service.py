@@ -92,6 +92,19 @@ class DocumentService:
             document.error_message = error_message
         return self.upsert_document(document)
 
+    def update_tags(self, document_id: str, tags: list[str]) -> DocumentRecord | None:
+        document = self.get_document(document_id)
+        if document is None:
+            return None
+        document.tags = [t.strip().lower() for t in tags if t.strip()]
+        return self.upsert_document(document)
+
+    def list_all_tags(self) -> list[str]:
+        all_tags: set[str] = set()
+        for doc in self.list_documents():
+            all_tags.update(doc.tags)
+        return sorted(all_tags)
+
     def _write(self, documents: list[DocumentRecord]) -> None:
         payload = [document.model_dump() for document in documents]
         self.env.documents_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")

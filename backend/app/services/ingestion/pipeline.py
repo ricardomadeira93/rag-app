@@ -15,10 +15,10 @@ from app.schemas.settings import PersistedSettings
 from app.services.document_service import DocumentService
 from app.services.embeddings.service import EmbeddingService
 from app.services.enrichment_service import EnrichmentService
-from app.services.ingestion.chunking import ChunkWithMeta, split_text_with_meta
+from app.services.ingestion.chunking import ChunkWithMeta, split_text_with_meta, split_text_structural
 from app.services.ingestion.extractors import TextExtractionService
 from app.services.vectorstore.chroma_store import ChromaVectorStore
-
+from app.services.vectorstore.bm25_store import BM25Store
 
 class IngestionPipeline:
     def __init__(
@@ -29,6 +29,7 @@ class IngestionPipeline:
         embeddings: EmbeddingService,
         enrichment_service: EnrichmentService,
         vector_store: ChromaVectorStore,
+        bm25_store: BM25Store,
     ) -> None:
         self.env = env
         self.document_service = document_service
@@ -36,15 +37,59 @@ class IngestionPipeline:
         self.embeddings = embeddings
         self.enrichment_service = enrichment_service
         self.vector_store = vector_store
+        self.bm25_store = bm25_store
 
     async def ingest_uploads(
         self,
         files: list[UploadFile],
         settings: PersistedSettings,
     ) -> list[DocumentRecord]:
+        from app.services.parsers.email_parser import parse_eml
+        from app.services.parsers.slack_parser import parse_slack_export
+
         queued_documents: list[DocumentRecord] = []
+        
+        # intercept and expand special manual import files
+        expanded_files: list[tuple[UploadFile, dict]] = []
         for upload in files:
-            placeholder, destination, mime_type = await self._prepare_upload(upload, settings)
+            if not upload.filename:
+                continue
+                
+            suffix = ensure_suffix(upload.filename).lower()
+            if suffix == ".eml":
+                file_bytes = await upload.read()
+                try:
+                    parsed = parse_eml(file_bytes)
+                    import io
+                    pseudo_file = UploadFile(
+                        file=io.BytesIO(parsed["content"].encode("utf-8")),
+                        filename=f"{parsed['title']}.txt",
+                        headers={"content-type": "text/plain"}
+                    )
+                    expanded_files.append((pseudo_file, parsed["metadata"]))
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Failed to parse EML: {e}")
+            elif suffix == ".zip":
+                file_bytes = await upload.read()
+                try:
+                    parsed_list = parse_slack_export(file_bytes)
+                    for parsed in parsed_list:
+                        import io
+                        pseudo_file = UploadFile(
+                            file=io.BytesIO(parsed["content"].encode("utf-8")),
+                            filename=f"{parsed['title']}.txt",
+                            headers={"content-type": "text/plain"}
+                        )
+                        expanded_files.append((pseudo_file, parsed["metadata"]))
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Failed to parse ZIP: {e}")
+            else:
+                expanded_files.append((upload, {}))
+
+        for upload, metadata in expanded_files:
+            placeholder, destination, mime_type = await self._prepare_upload(upload, settings, metadata)
             queued_documents.append(placeholder)
             asyncio.create_task(
                 self._index_saved_file_task(
@@ -60,6 +105,7 @@ class IngestionPipeline:
     async def reindex_all(self, settings: PersistedSettings) -> list[DocumentRecord]:
         existing_documents = self.document_service.list_documents()
         self.vector_store.reset()
+        self.bm25_store.reset()
 
         # Mark all docs as needing reprocessing before we start
         for doc in existing_documents:
@@ -93,6 +139,7 @@ class IngestionPipeline:
             return None
 
         self.vector_store.delete_document(document_id)
+        self.bm25_store.delete_document(document_id)
         self.document_service.delete_document(document_id)
         return existing
 
@@ -100,6 +147,7 @@ class IngestionPipeline:
         self,
         upload: UploadFile,
         settings: PersistedSettings,
+        metadata_override: dict | None = None,
     ) -> tuple[DocumentRecord, Path, str]:
         if not upload.filename:
             raise ValueError("Upload must include a filename")
@@ -108,6 +156,8 @@ class IngestionPipeline:
         if suffix not in SUPPORTED_EXTENSIONS:
             raise ValueError(f"Unsupported file type: {suffix}")
 
+        # ensure cursor is at 0 if we already read it during interception
+        await upload.seek(0)
         file_bytes = await upload.read()
         checksum = hashlib.sha256(file_bytes).hexdigest()
         destination = self.env.uploads_dir / f"{checksum}{suffix}"
@@ -117,6 +167,12 @@ class IngestionPipeline:
         # Create a placeholder record with "processing" status before heavy work begins
         document_id = checksum
         existing = self.document_service.get_document(document_id)
+        
+        metadata_override = metadata_override or {}
+        source_type = metadata_override.get("source_type", "upload")
+        doc_type = metadata_override.get("doc_type", "file")
+        source_connector = metadata_override.get("source_connector", "manual")
+
         if existing is None:
             placeholder = DocumentRecord(
                 id=document_id,
@@ -126,6 +182,9 @@ class IngestionPipeline:
                 extension=suffix,
                 checksum=checksum,
                 source_path=str(destination),
+                source_type=source_type,
+                doc_type=doc_type,
+                source_connector=source_connector,
                 embedding_provider=settings.embedding_provider,
                 embedding_model=settings.embedding_model,
                 embedding_version=settings.embedding_version,
@@ -166,12 +225,20 @@ class IngestionPipeline:
 
         enrichment = await self.enrichment_service.enrich(extracted.text)
 
-        chunk_metas: list[ChunkWithMeta] = split_text_with_meta(
-            extracted.text,
-            chunk_size=settings.chunk_size,
-            overlap=settings.chunk_overlap,
-            page_offsets=extracted.page_offsets,
-        )
+        if extracted.file_type == "markdown":
+            chunk_metas: list[ChunkWithMeta] = split_text_structural(
+                extracted.text,
+                chunk_size=settings.chunk_size,
+                overlap=settings.chunk_overlap,
+                page_offsets=extracted.page_offsets,
+            )
+        else:
+            chunk_metas: list[ChunkWithMeta] = split_text_with_meta(
+                extracted.text,
+                chunk_size=settings.chunk_size,
+                overlap=settings.chunk_overlap,
+                page_offsets=extracted.page_offsets,
+            )
         if not chunk_metas:
             raise ValueError(f"No chunks were produced for {original_filename}")
 
@@ -233,5 +300,25 @@ class IngestionPipeline:
             updated_at=timestamp,
         )
         self.vector_store.upsert_document(document, chunks, embeddings, settings.embedding_signature, chunk_metas=chunk_metas)
+        
+        # Build metadatas for BM25
+        metadatas = []
+        for index in range(len(chunks)):
+            metadatas.append({
+                "document_id": document.id,
+                "filename": document.filename,
+                "chunk_index": index,
+                "file_type_normalized": document.file_type.strip().lower(),
+                "document_type_normalized": (document.document_type or "").strip().lower(),
+                "page": chunk_metas[index].page if chunk_metas and chunk_metas[index].page is not None else -1,
+                "offset": chunk_metas[index].offset if chunk_metas else 0,
+                "created_at": document.created_at,
+                "source_type": document.source_type,
+                "doc_type": document.doc_type,
+            })
+            
+        chunk_ids = [f"{document.id}:{i}" for i in range(len(chunks))]
+        self.bm25_store.upsert_chunks(document.id, chunk_ids, chunks, metadatas)
+        
         self.document_service.upsert_document(document)
         return document

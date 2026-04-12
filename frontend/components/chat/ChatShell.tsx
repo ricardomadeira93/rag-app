@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
 import { StatusBanner } from "@/components/status-banner";
-import { fetchDocuments, fetchSettings, saveSettings, streamChat, createConversation, fetchMessages } from "@/lib/api";
-import type { ChatMessage as ChatMessageRecord, DocumentRecord, RetrievalDebugInfo, Settings, SourceCitation } from "@/lib/types";
+import { fetchDocuments, fetchSettings, saveSettings, streamChat, createConversation, fetchMessages, fetchConversation, toggleConversationPin } from "@/lib/api";
+import type { ChatMessage as ChatMessageRecord, DocumentRecord, RetrievalDebugInfo, Settings, SourceCitation, Conversation } from "@/lib/types";
+import { Search, Pin, PinOff, X } from "lucide-react";
 
 export function ChatShell({ conversationId }: { conversationId?: string }) {
   const router = useRouter();
@@ -19,7 +20,10 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(conversationId || null);
+  const [conversationMeta, setConversationMeta] = useState<Conversation | null>(null);
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     void Promise.all([fetchSettings(), fetchDocuments()])
@@ -33,18 +37,23 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
   // Fetch messages if a conversation ID is provided
   useEffect(() => {
     if (conversationId) {
-      void fetchMessages(conversationId)
-        .then((items) => {
-          setMessages(items.map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-            sources: msg.sources,
-            debug: null // Server doesn't persist debug info
-          })));
-        })
-        .catch(() => setError("Failed to load conversation history"));
+      void Promise.all([
+        fetchMessages(conversationId),
+        fetchConversation(conversationId).catch(() => null)
+      ]).then(([items, meta]) => {
+        setMessages(items.map((msg) => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          sources: msg.sources,
+          debug: null, // Server doesn't persist debug info
+          rating: msg.rating
+        })));
+        if (meta) setConversationMeta(meta);
+      }).catch(() => setError("Failed to load conversation history"));
     } else {
       setMessages([]);
+      setConversationMeta(null);
     }
   }, [conversationId]);
 
@@ -104,7 +113,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     }
 
     const requestMessages: ChatMessageRecord[] = [...messages, { role: "user", content }];
-    setMessages([...requestMessages, { role: "assistant", content: "", sources: [], debug: null }]);
+    setMessages([...requestMessages, { role: "assistant", content: "", sources: [], debug: null, isThinking: true }]);
     setInput("");
     setLoading(true);
     setError(null);
@@ -116,6 +125,9 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
         {
           onToken(token) {
             setMessages((current) => appendToAssistant(current, token));
+          },
+          onMeta(meta) {
+            setMessages((current) => attachMeta(current, meta));
           },
           onSources(sources) {
             setMessages((current) => attachSources(current, sources));
@@ -160,6 +172,22 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     void sendMessage(previousUser.content);
   }
 
+  const handleRate = async (index: number, rating: 1 | -1) => {
+    const msg = messages[index];
+    if (!msg || !msg.id) return;
+    try {
+      const api = await import("@/lib/api");
+      await api.rateMessage(msg.id, rating);
+      setMessages((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], rating };
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to rate message", err);
+    }
+  };
+
   function addAttachment(document: DocumentRecord) {
     setAttachedDocuments((current) => [...current, document]);
   }
@@ -167,6 +195,25 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
   function removeAttachment(documentId: string) {
     setAttachedDocuments((current) => current.filter((document) => document.id !== documentId));
   }
+
+  async function handleTogglePin() {
+    if (!activeConversationId || !conversationMeta) return;
+    try {
+      const nextPinned = !conversationMeta.pinned;
+      setConversationMeta({ ...conversationMeta, pinned: nextPinned });
+      await toggleConversationPin(activeConversationId, nextPinned);
+    } catch {
+      // Revert on error
+      setConversationMeta({ ...conversationMeta, pinned: conversationMeta.pinned });
+      setError("Failed to toggle pin");
+    }
+  }
+
+  const displayedMessages = useMemo(() => {
+    if (!searchQuery) return messages;
+    const lowerQuery = searchQuery.toLowerCase();
+    return messages.filter(msg => msg.content.toLowerCase().includes(lowerQuery));
+  }, [messages, searchQuery]);
 
   async function handleSettingChange<K extends keyof Settings>(key: K, value: Settings[K]) {
     if (!settings) return;
@@ -182,6 +229,62 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     <div className="relative min-h-[calc(100vh-72px)]">
       <div className="mx-auto flex min-h-[calc(100vh-72px)] max-w-6xl flex-col px-0 pb-28 pt-2">
         <div className="mx-auto w-full max-w-[680px] px-4">
+          {activeConversationId && conversationMeta ? (
+            <div className="mb-6 mt-2 flex items-center justify-between border-b border-[var(--border-soft)] pb-3">
+              {isSearching ? (
+                <div className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 py-1.5 focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]">
+                  <Search className="h-4 w-4 text-[var(--text-muted)]" />
+                  <input
+                    // eslint-disable-next-line jsx-a11y/no-autofocus
+                    autoFocus
+                    placeholder="Search in conversation..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSearching(false);
+                      setSearchQuery("");
+                    }}
+                    className="flex h-5 w-5 items-center justify-center rounded-md hover:bg-[var(--bg-subtle)] text-[var(--text-muted)]"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <h1 className="text-[14px] font-medium text-[var(--text-primary)] truncate pr-4">
+                    {conversationMeta.title}
+                  </h1>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsSearching(true)}
+                      className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                      title="Search in chat"
+                    >
+                      <Search className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleTogglePin()}
+                      className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                        conversationMeta.pinned 
+                          ? "text-[var(--accent)] hover:bg-[var(--accent-light)]" 
+                          : "text-[var(--text-muted)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+                      }`}
+                      title={conversationMeta.pinned ? "Unpin chat" : "Pin chat"}
+                    >
+                      {conversationMeta.pinned ? <Pin className="h-4 w-4 fill-current" /> : <PinOff className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
+
           {settings?.reindex_required ? (
             <div className="mb-4">
               <StatusBanner
@@ -200,7 +303,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
         </div>
 
         <MessageList
-          messages={messages}
+          messages={displayedMessages}
           isStreaming={loading}
           workspaceName={settings?.workspace_name || "Workspace"}
           suggestions={suggestions}
@@ -209,6 +312,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
           onRegenerate={handleRegenerate}
           onSaveAssistant={() => undefined}
           onSuggestionClick={setInput}
+          onRate={handleRate}
         />
 
         <div ref={scrollAnchorRef} />
@@ -237,7 +341,15 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
 function appendToAssistant(messages: ChatMessageRecord[], token: string) {
   return messages.map((message, index) =>
     index === messages.length - 1 && message.role === "assistant"
-      ? { ...message, content: `${message.content}${token}` }
+      ? { ...message, content: `${message.content}${token}`, isThinking: false }
+      : message,
+  );
+}
+
+function attachMeta(messages: ChatMessageRecord[], meta: { confidence: any; answer_type: string }) {
+  return messages.map((message, index) =>
+    index === messages.length - 1 && message.role === "assistant" 
+      ? { ...message, confidence: meta.confidence, answerType: meta.answer_type } 
       : message,
   );
 }

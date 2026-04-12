@@ -93,10 +93,25 @@ export default function DashboardPage() {
     [conversations],
   );
 
-  const lastUpdated = recentDocuments[0]?.updated_at ?? recentDocuments[0]?.created_at ?? null;
+  const lastUpdated = recentDocuments[0]?.created_at ?? null;
+  const [lastUpdatedLabel, setLastUpdatedLabel] = useState("");
   const workspaceName = settings?.workspace_name || "your workspace";
   const greeting = getGreeting();
   const hasDocuments = documents.length > 0;
+
+  // Auto-refresh "last updated" label every 60s
+  useEffect(() => {
+    function update() {
+      if (lastUpdated) {
+        setLastUpdatedLabel(`Updated ${formatRelativeTime(lastUpdated)}`);
+      } else {
+        setLastUpdatedLabel("");
+      }
+    }
+    update();
+    const timer = window.setInterval(update, 60_000);
+    return () => window.clearInterval(timer);
+  }, [lastUpdated]);
 
   const metrics = [
     { label: "Documents", value: documents.length, hint: `${documents.length > 0 ? `+${Math.min(documents.length, 2)}` : "0"} today`, tone: "bg-blue-500", icon: FileText, format: (value: number) => formatNumber(value) },
@@ -145,7 +160,7 @@ export default function DashboardPage() {
                 {greeting}, {workspaceName}
               </h1>
               <p className="text-[11px] text-[var(--text-muted)]">
-                {lastUpdated ? `Last updated ${formatRelativeTime(lastUpdated)}` : "Start building context with your first uploads."}
+                {lastUpdatedLabel || null}
               </p>
             </motion.section>
 
