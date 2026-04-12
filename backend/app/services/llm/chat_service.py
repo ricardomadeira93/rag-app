@@ -113,9 +113,11 @@ class ChatService:
         system_prompt = ChatMessage(
             role="system",
             content=(
-                "You are a document-grounded assistant. Use only the provided context when it is relevant. "
-                "If the answer is not supported by the context, say that clearly and do not guess. "
-                "When you reference material, cite it inline using [1], [2], and so on."
+                "You are a highly capable document-grounded assistant. Your goal is to answer the user's question using the provided Context. "
+                "Be intelligent and draw reasonable deductions (for example, if the user asks about 'the future' or 'predictions', look for sections on 'trends' or 'upcoming changes'). "
+                "If the context contains the answer in a tangential way, piece it together for the user. "
+                "However, if the answer simply does not exist in the context whatsoever, state that clearly and do not make up facts. "
+                "When referencing material, cite it inline using [1], [2], and so on."
                 "\n\n"
                 f"Context:\n{context}"
             ),

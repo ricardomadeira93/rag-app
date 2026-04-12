@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Paperclip, Plus, Send } from "lucide-react";
+import { ChevronDown, Paperclip, Plus, Send, Zap } from "lucide-react";
 import { KeyboardEvent, useMemo, useState } from "react";
 
 import { AttachmentChips } from "@/components/chat/AttachmentChips";
@@ -16,6 +16,10 @@ type ChatInputProps = {
   attachedDocuments: DocumentRecord[];
   availableDocuments: DocumentRecord[];
   modelLabel?: string;
+  semanticRouting?: boolean;
+  recommendedModels?: string[];
+  onModelChange?: (model: string) => void;
+  onToggleRouting?: (enabled: boolean) => void;
   onRemoveAttachment: (id: string) => void;
   onAddAttachment: (document: DocumentRecord) => void;
 };
@@ -29,13 +33,21 @@ export function ChatInput({
   attachedDocuments,
   availableDocuments,
   modelLabel = "Active model",
+  semanticRouting,
+  recommendedModels,
+  onModelChange,
+  onToggleRouting,
   onRemoveAttachment,
   onAddAttachment,
 }: ChatInputProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const attachableDocuments = useMemo(
-    () => availableDocuments.filter((document) => !attachedDocuments.some((attached) => attached.id === document.id)).slice(0, 8),
+    () =>
+      availableDocuments
+        .filter((document) => document.status === "indexed")
+        .filter((document) => !attachedDocuments.some((attached) => attached.id === document.id))
+        .slice(0, 8),
     [attachedDocuments, availableDocuments],
   );
 
@@ -92,17 +104,52 @@ export function ChatInput({
             />
 
             <div className="mt-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   title="Attach document"
                   onClick={() => setPickerOpen((current) => !current)}
                   disabled={availableDocuments.length === 0}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] disabled:opacity-40"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] disabled:opacity-40"
                 >
                   <Paperclip className="h-3.5 w-3.5" />
                 </button>
-                <span className="text-[11px] text-[var(--text-muted)]">{modelLabel}</span>
+
+                {onToggleRouting && semanticRouting !== undefined && (
+                  <button
+                    type="button"
+                    title="Semantic Routing (Automatic Mode)"
+                    onClick={() => onToggleRouting(!semanticRouting)}
+                    className={`flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                      semanticRouting
+                        ? "bg-[var(--accent)] text-white shadow-sm"
+                        : "bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    <Zap className={`h-3 w-3 ${semanticRouting ? "fill-white/20" : ""}`} />
+                    Auto
+                  </button>
+                )}
+
+                {onModelChange && recommendedModels ? (
+                  <div className="relative flex items-center">
+                    <select
+                      value={modelLabel}
+                      onChange={(e) => onModelChange(e.target.value)}
+                      className="h-6 w-full cursor-pointer appearance-none rounded-full bg-[var(--bg-subtle)] pl-3 pr-7 text-[11px] font-medium text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--line-subtle)] hover:text-[var(--text-primary)]"
+                    >
+                      {!recommendedModels.includes(modelLabel) && <option value={modelLabel}>{modelLabel}</option>}
+                      {recommendedModels.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2.5 h-3 w-3 text-[var(--text-muted)]" />
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-[var(--text-muted)]">{modelLabel}</span>
+                )}
               </div>
 
               <button

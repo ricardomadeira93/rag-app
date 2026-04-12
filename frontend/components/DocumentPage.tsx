@@ -49,7 +49,7 @@ export function DocumentPage({ documentId }: DocumentPageProps) {
 
   return (
     <div className="relative min-h-screen">
-      <div className="mx-auto max-w-3xl px-4 pb-24 pt-12 md:px-6 md:pt-20">
+      <div className="mx-auto max-w-5xl px-4 pb-24 pt-12 md:px-6 md:pt-20">
         <div className="mb-8">
           <Link href="/documents" className="inline-flex items-center gap-2 text-sm text-zinc-500 transition hover:text-zinc-950">
             <ArrowLeft className="h-4 w-4" />

@@ -98,22 +98,14 @@ export function UploadDropzone({
         <p className="mt-2 text-[12px] text-[var(--text-muted)]">
           PDF, audio, images, markdown. Up to 100MB.
         </p>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-          <button type="button" className="button-secondary" disabled={disabled}>
-            Choose files
-          </button>
-          <button
-            type="button"
-            className="button-primary"
-            disabled={disabled || items.length === 0 || isUploading}
-            onClick={(event) => {
-              event.stopPropagation();
-              void onUpload();
-            }}
-          >
-            {isUploading ? "Uploading…" : "Start upload"}
-          </button>
-        </div>
+        
+        {!isUploading && items.length === 0 ? (
+          <div className="mt-5">
+            <button type="button" className="button-secondary pointer-events-none" disabled={disabled}>
+              Browse files
+            </button>
+          </div>
+        ) : null}
 
         <input
           ref={inputRef}

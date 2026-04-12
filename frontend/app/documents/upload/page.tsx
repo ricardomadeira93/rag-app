@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 import { StatusBanner } from "@/components/status-banner";
 import { UploadDropzone } from "@/components/UploadDropzone";
@@ -52,6 +52,21 @@ export default function UploadPage() {
       setMessage(nextMessage);
     },
   });
+
+  const uploadTriggerTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    // If there are queued items and we are not currently uploading, automatically start.
+    // We use a small timeout to batch drag-and-drops elegantly.
+    if (!isUploading && uploadQueue.some((item) => item.status === "queued")) {
+      if (uploadTriggerTimer.current !== null) {
+        clearTimeout(uploadTriggerTimer.current);
+      }
+      uploadTriggerTimer.current = window.setTimeout(() => {
+        void startUpload();
+      }, 300);
+    }
+  }, [uploadQueue, isUploading, startUpload]);
 
   return (
     <motion.div initial="hidden" animate="visible" className="mx-auto max-w-4xl space-y-6">

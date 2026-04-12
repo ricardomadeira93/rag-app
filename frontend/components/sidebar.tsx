@@ -117,7 +117,7 @@ export function Sidebar() {
                               transition={{ ...transition, delay: index * 0.03 }}
                             >
                               <Link
-                                href="/chat"
+                                href={`/chat/${conversation.id}`}
                                 title={conversation.title}
                                 className="ml-7 flex h-7 items-center rounded-lg px-2 text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-secondary)]"
                               >

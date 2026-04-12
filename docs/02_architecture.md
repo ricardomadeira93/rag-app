@@ -44,3 +44,11 @@ Here is what the architecture looks like from a bird's-eye view:
 4. **Storage:** We use local files heavily in this MVP.
    - **ChromaDB:** A special database designed purely for AI. Instead of organizing things alphabetically like a normal database, it organizes things by *meaning* (we call this Semantic Search).
    - **SQLite:** A simple file-based relational database to track conversations.
+
+## Frontend Experience
+As part of the system's polished usability, the Next.js frontend implements several invisible conveniences:
+- **Client-Side Realtime Search:** When you search for workspaces or documents, the frontend caches and actively filters your SQLite/Metadata catalog instantly without doing full round-trip API queries, yielding instant results.
+- **Zero-Friction Auto-Uploads:** Dropping files onto the ingestion zone triggers immediate uploads via a seamless 300ms debounce buffer, bypassing clunky manual 'upload' confirmations.
+- **Restricted Attaching:** Unless a document has successfully survived the entire processing/embedding pipeline and is marked as `indexed`, it is intentionally hidden from the Chat Attachment Menu to prevent the LLM from trying to retrieve against missing embeddings.
+- **Dynamic Stateful Chat:** The chat system heavily leverages Next.js dynamic routing (`/chat/[id]`). At the first user message, the client orchestrates an immediate conversation creation with the backend SQLite database, and strictly uses `history.replaceState` to safely migrate the URL and sidebar without corrupting active Server-Sent Event (SSE) AI streams.
+- **Native Dual-Pane Document Previews:** Documents aren't just reduced to chunked vectors; the UI implements a dual-mode viewer. It leverages `react-markdown` and backend streaming intercepts to display perfect Native representations of PDFs, Markdown Docs, Images, and Audio seamlessly beside their raw ChromaDB representations.

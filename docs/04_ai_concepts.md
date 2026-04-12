@@ -37,6 +37,19 @@ If I ask you to search for words similar to "King", you don't look at the letter
 
 **In this project:** This *entire* application is a RAG pipeline! `RetrievalService` handles finding the open textbook page. `ChatService._build_messages()` handles pasting that page underneath the user's question so the LLM doesn't guess.
 
+## The "System Prompt" Governance
+
+The LLM is governed by a strict internal instruction set called the **System Prompt**. Initially, RAG systems are prone to hallucinating, so the initial prompt forcefully instructed the AI: "*Use only the provided context. If it's not supported, do not guess.*"
+
+However, an AI that is *too* restricted becomes practically useless—if a user asks about "the future of frontend" and the document discusses "design trends", an over-restricted AI will refuse to answer because the exact phrase "the future" isn't present!
+
+To solve this, our system uses **Synthesized Logical Deduction**. We've softened the prompt to instruct the AI to be highly capable: it is forbidden from hallucinating raw facts, but it is explicitly encouraged to draw reasonable logical deductions (like equating "trends" to "the future") and piece together tangential evidence.
+
+---
+
+### Step 4: The Answer
+The LLM now acts like a brilliant student taking an open-book test. It reads your question, refers back to the extracted text chunks as its only "book," synthesizes the information intelligently, and types out a beautifully formatted answer.
+
 ---
 
 ## 4. Chunking

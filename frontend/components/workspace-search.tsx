@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileText, MessageSquare, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { fetchConversations, fetchDocuments } from "@/lib/api";
+import { formatFileSize } from "@/lib/documents";
 
 type SearchResult = {
   type: "document" | "conversation";
@@ -13,11 +15,43 @@ type SearchResult = {
 };
 
 async function fetchSearchResults(query: string): Promise<SearchResult[]> {
-  if (!query.trim()) return [];
-  // Stub: backend GET /search endpoint not yet implemented.
-  // Replace this block with a real fetch when the endpoint is available.
-  console.warn("[WorkspaceSearch] GET /search endpoint not yet implemented — returning empty results.");
-  return [];
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  
+  // We perform client-side filtering by hitting the standard GET endpoints for now.
+  // This is highly responsive for small-to-medium local knowledge bases.
+  try {
+    const [docs, convs] = await Promise.all([
+      fetchDocuments().catch(() => []), 
+      fetchConversations().catch(() => [])
+    ]);
+
+    const docResults: SearchResult[] = docs
+      .filter((d) => d.filename.toLowerCase().includes(q))
+      .slice(0, 5)
+      .map((d) => ({
+        type: "document",
+        id: d.id,
+        title: d.filename,
+        subtitle: `${formatFileSize(d.file_size_bytes)} • ${d.status}`,
+        href: `/documents/${d.id}`,
+      }));
+
+    const convResults: SearchResult[] = convs
+      .filter((c) => (c.title || "Untitled").toLowerCase().includes(q))
+      .slice(0, 5)
+      .map((c) => ({
+        type: "conversation",
+        id: c.id,
+        title: c.title || "Untitled Conversation",
+        href: `/chat/${c.id}`,
+      }));
+
+    return [...docResults, ...convResults];
+  } catch (error) {
+    console.error("[WorkspaceSearch] Failed to fetch data for search", error);
+    return [];
+  }
 }
 
 export function WorkspaceSearch() {

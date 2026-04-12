@@ -83,7 +83,8 @@ class RetrievalService:
         reranked: list[SourceCitation] = []
         for source, timestamp in zip(sources, timestamps):
             recency_score = (timestamp - min_timestamp) / span if max_timestamp != min_timestamp else 1.0
-            final_score = (source.similarity_score * 0.7) + (recency_score * 0.3)
+            # Reduced recency penalty from 30% to 5% to prevent it from burying highly semantically relevant older documents.
+            final_score = (source.similarity_score * 0.95) + (recency_score * 0.05)
             reranked.append(source.model_copy(update={"score": final_score}))
 
         reranked.sort(key=lambda item: item.score, reverse=True)

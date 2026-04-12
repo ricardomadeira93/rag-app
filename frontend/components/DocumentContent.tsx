@@ -1,8 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Copy, FileSearch } from "lucide-react";
-import { useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Copy, FileSearch, FileText, LayoutGrid } from "lucide-react";
+import { useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { Button } from "@/components/ui/button";
@@ -28,7 +30,10 @@ export function DocumentContent({ detail }: DocumentContentProps) {
   const content = detail.content?.trim() ?? "";
   const blocks = useMemo(() => parseMarkdownLikeContent(content), [content]);
 
-  if (!content) {
+  // Tab State: "native" | "extraction"
+  const [activeTab, setActiveTab] = useState<"native" | "extraction">("native");
+
+  if (!content && type !== "pdf" && type !== "image" && type !== "audio") {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -36,50 +41,124 @@ export function DocumentContent({ detail }: DocumentContentProps) {
         transition={springTransition}
         className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center"
       >
-        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-zinc-100 text-zinc-500">
+        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[var(--bg-subtle)] text-[var(--text-muted)]">
           <FileSearch className="h-6 w-6" />
         </div>
-        <p className="mt-5 text-lg font-medium text-zinc-950">No extracted text available</p>
-        <p className="mt-2 max-w-lg text-base leading-8 text-zinc-500">
-          This document was indexed, but readable content is not available yet. Try downloading the original file or asking AI to work from the indexed chunks.
+        <p className="mt-5 text-lg font-medium text-[var(--text-primary)]">No content available</p>
+        <p className="mt-2 max-w-lg text-base leading-8 text-[var(--text-secondary)]">
+          This document was indexed, but readable content could not be retrieved. Try downloading the original file or asking AI.
         </p>
       </motion.div>
     );
   }
+
+  const fileUrl = `/api/documents/${detail.item.id}/file`;
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={springTransition}
-      className="document-prose pb-24"
+      className="pb-24 pt-8"
     >
-      {type === "audio" ? <AudioPlayer src={`/api/documents/${detail.item.id}/file`} title={detail.item.filename} /> : null}
-      {type === "audio" ? <SectionLabel>Transcript</SectionLabel> : null}
-      {type === "pdf" ? <SectionLabel>Extracted text</SectionLabel> : null}
-      {renderBlocks(blocks)}
+      <div className="mb-6 flex items-center gap-6 border-b border-zinc-200">
+        <button
+          onClick={() => setActiveTab("native")}
+          className={`flex items-center gap-2 border-b-2 pb-3 text-[13px] font-medium transition-colors ${
+            activeTab === "native"
+              ? "border-[var(--text-primary)] text-[var(--text-primary)]"
+              : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+          }`}
+        >
+          <FileText className="h-4 w-4" />
+          Original File
+        </button>
+        <button
+          onClick={() => setActiveTab("extraction")}
+          className={`flex items-center gap-2 border-b-2 pb-3 text-[13px] font-medium transition-colors ${
+            activeTab === "extraction"
+              ? "border-[var(--text-primary)] text-[var(--text-primary)]"
+              : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+          }`}
+        >
+          <LayoutGrid className="h-4 w-4" />
+          RAG Extraction
+        </button>
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.15 }}
+          className="min-h-[500px]"
+        >
+          {activeTab === "native" && (
+            <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-sm overflow-hidden min-h-[400px]">
+              {type === "pdf" ? (
+                <iframe src={`${fileUrl}#view=FitH`} className="w-full h-[85vh] border-none" title={detail.item.filename} />
+              ) : type === "image" ? (
+                <div className="p-4 bg-[var(--bg-subtle)] flex items-center justify-center min-h-[400px]">
+                  <img src={fileUrl} alt={detail.item.filename} className="max-w-full rounded-xl object-contain" />
+                </div>
+              ) : type === "audio" ? (
+                <div className="p-8 bg-[var(--bg-subtle)] flex items-center justify-center min-h-[400px]">
+                  <div className="w-full max-w-md">
+                    <p className="text-center text-sm font-medium text-[var(--text-primary)] mb-6">{detail.item.filename}</p>
+                    <AudioPlayer src={fileUrl} title={detail.item.filename} />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 lg:p-12">
+                  <div className="prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none text-[var(--text-secondary)]">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {content}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "extraction" && (
+            <div className="document-prose max-w-none">
+              {ExtractedBlocksView(blocks)}
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </motion.div>
   );
 }
 
-function renderBlocks(blocks: MarkdownBlock[]) {
+function ExtractedBlocksView(blocks: MarkdownBlock[]) {
+  if (blocks.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-[13px] text-[var(--text-muted)]">No extracted paragraphs found for this document.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {blocks.map((block, index) => {
         if (block.type === "heading") {
           const className =
             block.level === 1
-              ? "mt-10 text-4xl font-semibold tracking-tight text-zinc-950"
+              ? "mt-8 text-2xl font-semibold tracking-tight text-[var(--text-primary)]"
               : block.level === 2
-                ? "mt-10 text-2xl font-semibold tracking-tight text-zinc-950"
-                : "mt-8 text-xl font-semibold tracking-tight text-zinc-900";
+                ? "mt-6 text-xl font-semibold tracking-tight text-[var(--text-primary)]"
+                : "mt-4 text-base font-semibold tracking-tight text-[var(--text-secondary)]";
 
           return (
             <motion.div
               key={`heading-${index}`}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springTransition, delay: Math.min(index * 0.03, 0.18) }}
+              transition={{ ...springTransition, delay: Math.min(index * 0.02, 0.1) }}
             >
               {block.level === 1 ? (
                 <h1 className={className}>{block.content}</h1>
@@ -103,39 +182,32 @@ function CopyableParagraph({ text, index }: { text: string; index: number }) {
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      // Ignore clipboard failures in unsupported environments.
+      // Ignore
     }
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ ...springTransition, delay: Math.min(index * 0.03, 0.18) }}
-      className="group -mx-3 rounded-2xl px-3 py-1"
+      transition={{ ...springTransition, delay: Math.min(index * 0.02, 0.1) }}
+      className="group -mx-3 rounded-2xl px-3 py-2 transition-colors hover:bg-[var(--bg-subtle)]"
     >
-      <div className="flex items-start gap-4">
-        <p className="flex-1 whitespace-pre-wrap text-[17px] leading-[1.8] text-zinc-700">{text}</p>
+      <div className="flex items-start gap-3">
+        <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--border-soft)]" />
+        <p className="flex-1 whitespace-pre-wrap text-[13px] leading-[1.7] text-[var(--text-secondary)]">{text}</p>
         <Button
           variant="ghost"
           size="sm"
           type="button"
           onClick={() => void handleCopy()}
-          className="mt-1 opacity-0 transition-opacity group-hover:opacity-100"
+          className="opacity-0 transition-opacity group-hover:opacity-100 h-8 text-[11px]"
         >
-          <Copy className="mr-1.5 h-3.5 w-3.5" />
+          <Copy className="mr-1.5 h-3 w-3" />
           Copy
         </Button>
       </div>
     </motion.div>
-  );
-}
-
-function SectionLabel({ children }: { children: string }) {
-  return (
-    <div className="mb-8 text-xs font-medium uppercase tracking-[0.22em] text-zinc-400">
-      {children}
-    </div>
   );
 }
 
