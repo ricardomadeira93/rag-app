@@ -31,8 +31,15 @@ class ChatService:
         if not prompt:
             raise ValueError("At least one user message is required")
 
+        # SMART QUERY OPTIMIZATION (TYPO CORRECTION)
+        search_query = prompt
+        if settings.semantic_routing_enabled and settings.enrichment_model:
+            search_query = await self._optimize_query(prompt, settings)
+            if search_query != prompt:
+                yield sse_event("debug", {"step": "optimizer", "original": prompt, "optimized": search_query})
+
         retrieval = await self.retrieval_service.retrieve(
-            query=prompt,
+            query=search_query,
             settings=settings,
             filters=request.filters,
             debug=request.debug,
@@ -75,6 +82,39 @@ class ChatService:
 
         yield sse_event("sources", {"items": [source.model_dump() for source in sources]})
         yield sse_event("done", {"ok": True})
+
+    async def _optimize_query(self, prompt: str, settings: PersistedSettings) -> str:
+        if not settings.semantic_routing_enabled or not settings.enrichment_model:
+            return prompt
+
+        optimizer_prompt = (
+            "You are a search query optimizer. The user provides a query that may contain typos or "
+            "poor formatting which breaks mathematical vector embeddings. "
+            "Fix any typographical errors (e.g., 'pyhton' -> 'python', 'docment' -> 'document'). "
+            "Do NOT add new information or completely rewrite the intent. "
+            "Return JSON only in this format: {\"optimized_query\": \"the corrected query\"}.\n\n"
+            f"User Query:\n{prompt}"
+        )
+        try:
+            provider = build_llm_provider(settings, self.env, use_enrichment_model=True)
+            response_text = await provider.generate_json(
+                [ChatMessage(role="user", content=optimizer_prompt)]
+            )
+            candidate = response_text.strip()
+            if candidate.startswith("```"):
+                candidate = candidate.strip("`")
+                if candidate.lower().startswith("json"):
+                    candidate = candidate[4:].strip()
+
+            start = candidate.find("{")
+            end = candidate.rfind("}")
+            if start != -1 and end != -1 and start <= end:
+                parsed = json.loads(candidate[start : end + 1])
+                return parsed.get("optimized_query", prompt).strip()
+        except Exception as exc:
+            logger.warning("Query optimization failed: %s", exc)
+            
+        return prompt
 
     async def _route_intent(self, prompt: str, settings: PersistedSettings) -> bool:
         # Returns True if it is a simple task that can use the fast enrichment model
@@ -123,10 +163,9 @@ class ChatService:
             ),
         )
 
-        # Keep only prior user turns. Replaying previous assistant answers can
-        # reinforce earlier hallucinations even when retrieval changes.
-        filtered_messages = [message for message in messages if message.role == "user"]
-        return [system_prompt, *filtered_messages]
+        # Pass the full conversation history. Stripping assistant messages causes 
+        # consecutive user prompts which deeply confuses the LLM's conversational timeline.
+        return [system_prompt, *messages]
 
     def _build_context(self, sources: list[SourceCitation]) -> str:
         blocks = []

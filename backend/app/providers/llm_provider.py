@@ -68,15 +68,15 @@ class OllamaChatProvider:
     base_url: str
 
     async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[str]:
-        prompt = _build_prompt(messages)
+        payload_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
         client = build_ollama_client(self.base_url)
-        async for token in client.stream_generate(prompt=prompt, model=self.model):
+        async for token in client.stream_chat(messages=payload_messages, model=self.model):
             yield token
 
     async def generate_json(self, messages: list[ChatMessage]) -> str:
-        prompt = _build_prompt(messages)
+        payload_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
         client = build_ollama_client(self.base_url)
-        return await client.generate(prompt=prompt, model=self.model, format="json")
+        return await client.chat(messages=payload_messages, model=self.model, format="json")
 
 
 def build_llm_provider(settings: PersistedSettings, env: EnvironmentSettings, use_enrichment_model: bool = False) -> LLMProvider:
@@ -112,10 +112,4 @@ def _read(value: object, key: str) -> object | None:
     return getattr(value, key, None)
 
 
-def _build_prompt(messages: list[ChatMessage]) -> str:
-    lines: list[str] = []
-    for message in messages:
-        label = message.role.capitalize()
-        lines.append(f"{label}: {message.content}")
-    lines.append("Assistant:")
-    return "\n\n".join(lines)
+# Function removed as native chat templates are now strictly leveraged.

@@ -41,7 +41,10 @@ class RetrievalService:
             filters=where_filter,
         )
         reranked = self._rerank(candidates)
-        selected = reranked[: settings.top_k]
+        # Ensure the AI receives an absolute minimum of 8 chunks (unless they configured more)
+        # Without this, low UI settings forcibly push slightly-older but highly relevant chunks out of bounds
+        actual_top_k = max(settings.top_k, 8)
+        selected = reranked[: actual_top_k]
 
         debug_payload = None
         if debug:

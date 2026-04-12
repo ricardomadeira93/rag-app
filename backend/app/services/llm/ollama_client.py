@@ -58,6 +58,38 @@ class OllamaClient:
                     if token:
                         yield str(token)
 
+    async def chat(self, messages: list[dict[str, str]], model: str, format: str | dict | None = None) -> str:
+        payload = {"model": model, "messages": messages, "stream": False}
+        if format is not None:
+            payload["format"] = format
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{self.base_url}/api/chat",
+                json=payload,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        message = payload.get("message", {})
+        return str(message.get("content", ""))
+
+    async def stream_chat(self, messages: list[dict[str, str]], model: str) -> AsyncIterator[str]:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/api/chat",
+                json={"model": model, "messages": messages, "stream": True},
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    chunk = json.loads(line)
+                    message = chunk.get("message", {})
+                    token = message.get("content")
+                    if token:
+                        yield str(token)
+
     async def embed(self, text: str, model: str) -> list[float]:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(

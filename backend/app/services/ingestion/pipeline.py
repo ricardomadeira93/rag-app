@@ -66,20 +66,24 @@ class IngestionPipeline:
             self.document_service.update_status(doc.id, "needs_reprocessing")
 
         updated_documents: list[DocumentRecord] = []
-        for document in existing_documents:
-            try:
-                result = await self._index_saved_file(
-                    Path(document.source_path), document.filename, document.mime_type, settings
-                )
-                updated_documents.append(result)
-            except Exception as exc:
-                self.document_service.update_status(
-                    document.id, "failed", error_message=str(exc)
-                )
-                # Preserve the existing record with failed status
-                failed_doc = self.document_service.get_document(document.id)
-                if failed_doc:
-                    updated_documents.append(failed_doc)
+        semaphore = asyncio.Semaphore(3)
+
+        async def _reindex_doc(document: DocumentRecord) -> DocumentRecord | None:
+            async with semaphore:
+                try:
+                    return await self._index_saved_file(
+                        Path(document.source_path), document.filename, document.mime_type, settings
+                    )
+                except Exception as exc:
+                    self.document_service.update_status(
+                        document.id, "failed", error_message=str(exc)
+                    )
+                    # Preserve the existing record with failed status
+                    return self.document_service.get_document(document.id)
+
+        tasks = [_reindex_doc(doc) for doc in existing_documents]
+        results = await asyncio.gather(*tasks)
+        updated_documents = [res for res in results if res is not None]
 
         return updated_documents
 
@@ -174,12 +178,22 @@ class IngestionPipeline:
         # Anthropic's Contextual Retrieval
         # We loop through the orphaned chunks and ask the Enrichment AI to sew them 
         # back to the global summary before we embed them mathematically.
-        for cm in chunk_metas:
-            header = await self.enrichment_service.contextualize_chunk(
-                enrichment.summary, cm.text, settings
-            )
-            if header:
-                cm.text = f"[Context: {header}]\n\n{cm.text}"
+        semaphore = asyncio.Semaphore(10)
+
+        async def _process_chunk(cm: ChunkWithMeta) -> None:
+            async with semaphore:
+                header = await self.enrichment_service.contextualize_chunk(
+                    enrichment.summary, cm.text, settings
+                )
+                
+                # Inject the filename to boost semantic matching for title keywords
+                file_meta = f"Filename: {original_filename}\n"
+                if header:
+                    cm.text = f"{file_meta}[Context: {header}]\n\n{cm.text}"
+                else:
+                    cm.text = f"{file_meta}\n{cm.text}"
+
+        await asyncio.gather(*(_process_chunk(cm) for cm in chunk_metas))
 
         chunks = [cm.text for cm in chunk_metas]
 

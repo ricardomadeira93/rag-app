@@ -47,7 +47,7 @@ class PersistedSettings(BaseModel):
 
     chunk_size: int = Field(default=1200, ge=300, le=4000)
     chunk_overlap: int = Field(default=200, ge=0, le=1500)
-    top_k: int = Field(default=4, ge=1, le=12)
+    top_k: int = Field(default=10, ge=1, le=20)
 
     ui_font_size: int = Field(default=DEFAULT_UI_FONT_SIZE, ge=14, le=18)
     ui_accent_color: str = Field(default=DEFAULT_UI_ACCENT)
@@ -111,7 +111,7 @@ class SettingsUpdate(BaseModel):
 
     chunk_size: Optional[int] = Field(default=None, ge=300, le=4000)
     chunk_overlap: Optional[int] = Field(default=None, ge=0, le=1500)
-    top_k: Optional[int] = Field(default=None, ge=1, le=12)
+    top_k: Optional[int] = Field(default=None, ge=1, le=20)
 
     ui_font_size: Optional[int] = Field(default=None, ge=14, le=18)
     ui_accent_color: Optional[str] = None

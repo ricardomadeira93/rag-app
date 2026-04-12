@@ -6,10 +6,10 @@ This document defines the state-of-the-art strategies, explains why they are nee
 
 ---
 
-## 1. Contextual Retrieval (The Anthropic Method)
+## 1. Contextual Retrieval (The Anthropic Method) - ✨ NOW IMPLEMENTED
 **The Concept:** When a document is sliced into chunks, individual paragraphs lose the context of the title and the surrounding document. Contextual Retrieval uses an AI to read the whole document, and then write a "Context Header" (e.g., `[Document: HR Policy, Topic: PTO]`) which is glued to the beginning of *every single chunk* before math embeddings are calculated.
 **What we currently use:** 
-*We do NOT use this yet.* Our app chunks text purely based on characters (e.g., every 500 letters ending in a period). If a chunk says *"He fired the employee,"* the embedding has no idea who "He" is unless the user's search query happens to match perfectly.
+*We use this!* We heavily leverage the Anthropic Contextual Retrieval methodology during document ingestion. We natively prepend both the explicitly queried `Filename` and the AI-generated `Context` summary headers explicitly into the chunk strings. To circumvent heavy latency, these LLM enrichment calls are fanned out in parallel via `asyncio.gather` while respecting strict API limits via Semaphores.
 
 ## 2. Parent-Child / Multi-Vector Retrieval
 **The Concept:** Searching for small sentences is mathematically highly accurate, but feeding an AI small sentences removes nuance. In Parent-Child retrieval, a document is sliced into massive "Parent" chunks (3,000 characters), which are sliced into tiny "Child" sentences (200 characters). Only the Children are embedded into the Database. When a match is found on a Child, the Database returns the entire Parent block to the Chat AI to provide massive surrounding context.
@@ -24,12 +24,17 @@ This document defines the state-of-the-art strategies, explains why they are nee
 **Frontend Integration:**
 In the Frontend Settings dashboard, an "Orchestration & Routing" panel explicitly exposes this to the user via the `semantic_routing_enabled` toggle and an auto-completing `enrichment_model` Datalist dropdown. If the router economizes a query, the backend fires an Server-Sent Event (SSE) to the frontend alerting the user that the background enrichment model was silently used.
 
-## 4. Agentic Query Decomposition
+## 4. Pre-Retrieval Query Optimization (Typo Correction) - ✨ NOW IMPLEMENTED
+**The Concept:** Dense embedding models are extremely brittle and rely on generic sub-word tokens. The embedding vector for `pyhton` is drastically mathematically divergent from the embedding vector for `python`. Queries with typos or slang often fail entirely. Query Optimization runs a fast AI-check on incoming questions to identify semantic intent and repair spelling arrays before ever touching mathematical arrays. 
+**What we currently use:**
+*We use this!* Inside the `ChatService`, if semantic routing is enabled, we immediately pass the user's raw input through the light `enrichment_model` exclusively to rewrite formatting and typographical errors, silently rescuing mathematical precision completely out of view of the user.
+
+## 5. Hybrid Search (Dense + Lexical)
 **The Concept:** Vector embeddings look for "meaning" (Dense Search). BM25/Elasticsearch looks for exact character matches (Lexical Search). Hybrid Search runs both databases at the same time and uses RRF math to combine the score of the meaning search with the score of the exact keyword search.
 **What we currently use:**
 *We use 100% Dense Vector Search (ChromaDB).* If a user searches for an exact serial number like "AX-491", our system might struggle because it is looking for the "semantic meaning" of those alphanumeric characters, which doesn't exist.
 
-## 5. Audio Speaker Diarization
+## 6. Audio Speaker Diarization
 **The Concept:** Using neural networks to analyze the pitch and tone of an audio waveform to identify *who* is speaking, turning a single block of text into a script (`Speaker 1: Hi. Speaker 2: Hello.`).
 **What we currently use:**
 *We use basic Whisper transcription.* Our app listens to an MP3 and generates a continuous wall of text without separating or identifying individual human voices.

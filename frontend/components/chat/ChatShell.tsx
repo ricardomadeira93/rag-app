@@ -49,7 +49,13 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
   }, [conversationId]);
 
   useEffect(() => {
-    scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // Only smooth scroll on final completion to prevent severe animation jitter during fast token streaming.
+    if (scrollAnchorRef.current) {
+        scrollAnchorRef.current.scrollIntoView({ 
+            behavior: loading ? "auto" : "smooth", 
+            block: "end" 
+        });
+    }
   }, [messages, loading]);
 
   const recentDocuments = useMemo(

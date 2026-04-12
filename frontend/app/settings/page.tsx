@@ -13,7 +13,7 @@ import { deleteDocument, fetchDocuments, fetchSettings, reindexDocuments, saveSe
 import type { Settings } from "@/lib/types";
 import { applyUiTheme } from "@/lib/ui-theme";
 
-const tabs = ["General", "Identity", "Data", "About"] as const;
+const tabs = ["General", "Advanced", "Data", "About"] as const;
 type Tab = (typeof tabs)[number];
 
 export default function SettingsPage() {
@@ -193,7 +193,7 @@ export default function SettingsPage() {
         ))}
       </nav>
 
-      {activeTab === "General" ? (
+      {activeTab === "Advanced" ? (
         <div className="space-y-4">
           <SettingsPanel title="Primary AI Model" description="The main brain used for complex questions and analytical reasoning.">
             <div className="grid gap-4 md:grid-cols-2">
@@ -373,6 +373,17 @@ export default function SettingsPage() {
             ) : null}
           </SettingsPanel>
 
+
+          <div className="flex justify-end">
+            <button type="button" onClick={() => void handleSave()} disabled={saving} className="button-primary">
+              {saving ? "Saving..." : "Save settings"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "General" ? (
+        <div className="space-y-4">
           <SettingsPanel title="Appearance" description="Tune the base typography and accent color for the workspace.">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
@@ -408,16 +419,6 @@ export default function SettingsPage() {
             </div>
           </SettingsPanel>
 
-          <div className="flex justify-end">
-            <button type="button" onClick={() => void handleSave()} disabled={saving} className="button-primary">
-              {saving ? "Saving..." : "Save settings"}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {activeTab === "Identity" ? (
-        <div className="space-y-4">
           <SettingsPanel title="Workspace context" description="Update the information collected during onboarding.">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2 md:col-span-2">

@@ -17,8 +17,8 @@
   --border-soft: #e4e2d8;
   --border-strong: #ccc9bc;
   --text-primary: #1a1917;
-  --text-secondary: #4a4844;
-  --text-muted: #908e86;
+  --text-secondary: #403e3a;
+  --text-muted: #6b6863;
   --accent: var(--accent-custom);
   --accent-light: #eeeffd;
   --accent-text: var(--accent-custom-hover);
@@ -43,8 +43,8 @@ html.dark {
   --border-soft: #2e2d2a;
   --border-strong: #3d3c38;
   --text-primary: #ededea;
-  --text-secondary: #a8a69e;
-  --text-muted: #68665e;
+  --text-secondary: #b5b3a9;
+  --text-muted: #8b8882;
   --accent: #7b7bf0;
   --accent-light: #1e1e3f;
   --accent-text: #a5a5f8;
@@ -111,14 +111,14 @@ a {
   .panel {
     background: var(--bg-surface);
     border: 1px solid var(--border-soft);
-    border-radius: 12px;
+    border-radius: 8px;
     box-shadow: var(--shadow-soft);
   }
 
   .panel-raised {
     background: var(--bg-raised);
     border: 1px solid var(--border-soft);
-    border-radius: 12px;
+    border-radius: 8px;
     box-shadow: var(--shadow-soft);
   }
 
@@ -144,7 +144,7 @@ a {
     border: 1px solid var(--border-strong);
     background: var(--bg-subtle);
     color: var(--text-primary);
-    border-radius: 8px;
+    border-radius: 6px;
     outline: none;
     transition:
       border-color 150ms ease,
@@ -181,7 +181,7 @@ a {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    border-radius: 8px;
+    border-radius: 6px;
     font-size: 13px;
     font-weight: 500;
     transition:
@@ -208,7 +208,7 @@ a {
     gap: 8px;
     min-height: 32px;
     padding: 0 12px;
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--accent);
     color: #ffffff;
     font-size: 13px;
@@ -239,7 +239,7 @@ a {
     gap: 8px;
     min-height: 32px;
     padding: 0 12px;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid var(--border-strong);
     background: var(--bg-surface);
     color: var(--text-primary);
@@ -273,7 +273,7 @@ a {
     gap: 8px;
     min-height: 32px;
     padding: 0 10px;
-    border-radius: 8px;
+    border-radius: 6px;
     color: var(--text-secondary);
     font-size: 13px;
     font-weight: 500;

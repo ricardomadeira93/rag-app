@@ -61,3 +61,13 @@ The LLM now acts like a brilliant student taking an open-book test. It reads you
 **In this project:** Look at `split_text_with_meta` in `app/services/ingestion/chunking.py`. If we upload a 300-page book, we chunk it into paragraphs of 500 characters. Why?
 1. The AI model physically cannot process 300 pages at the same time.
 2. If we embed a giant page into one set of numbers, the "GPS coordinate" gets washed out and confusing. By chunking into paragraphs, every single paragraph gets its own highly accurate GPS coordinate, making search perfect.
+
+---
+
+## 5. Top-K Retrieval
+
+**What it means:** When you ask a question, the math engine (Vector Database) finds the paragraphs that best match your question. "Top-K" is just the limit on how many paragraphs the AI is actually allowed to read before answering. If K = 5, the AI only gets to read the 5 best paragraphs.
+
+**Analogy:** Imagine hiring an investigator to look through a library of 10,000 books to find information on "Apples". The investigator finds 50 books that mention Apples. But you only gave the investigator a briefcase that can hold exactly 5 books. The investigator takes the "Top 5" best books, leaves the other 45 behind, and returns to you. 
+
+**In this project:** If you upload 20 documents about "Python", they might get chopped up into 100 chunks. If you search "Python" while your app's `Top-K` setting is only `4`, the AI will exclusively read the absolute 4 most mathematically relevant chunks and then stop. If the answer you actually wanted was located in the 5th chunk, the AI fails because it wasn't allowed to read that far. Bumping your "Top-K" slider higher gives the AI a bigger briefcase to carry more information context back to you!
