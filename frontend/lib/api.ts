@@ -1,5 +1,6 @@
 import {
   ChatFilters,
+  ChatMeta,
   ChatScopingInfo,
   Conversation,
   DiskUsage,
@@ -9,10 +10,13 @@ import {
   DocumentRecord,
   OllamaStatus,
   PersistedMessage,
+  ResponseMode,
   RetrievalDebugInfo,
   Settings,
+  SourceRecord,
   SourceCitation,
   StorageUsage,
+  Workspace,
 } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -72,9 +76,9 @@ export async function deleteDocument(documentId: string): Promise<DeleteDocument
   return readJson<DeleteDocumentResponse>(response);
 }
 
-export async function fetchSources(): Promise<any[]> {
+export async function fetchSources(): Promise<SourceRecord[]> {
   const response = await fetch(`${API_URL}/sources`, { cache: "no-store" });
-  return readJson<any[]>(response);
+  return readJson<SourceRecord[]>(response);
 }
 
 export async function fetchAllTags(): Promise<string[]> {
@@ -136,11 +140,16 @@ export async function streamChat(
     debug?: boolean;
     filters?: ChatFilters;
     conversation_id?: string;
+    mode?: ResponseMode | null;
+    rerun?: boolean;
+    mentioned_doc_ids?: string[];
+    tags?: string[];
+    scoped_doc_ids?: string[];
   },
   handlers: {
     onToken: (token: string) => void;
     onSources: (sources: SourceCitation[]) => void;
-    onMeta?: (meta: { confidence: "high"|"medium"|"low"|"none", answer_type: string }) => void;
+    onMeta?: (meta: ChatMeta) => void;
     onScoping?: (scoping: ChatScopingInfo) => void;
     onDebug?: (debug: RetrievalDebugInfo) => void;
     onError: (message: string) => void;
@@ -157,6 +166,11 @@ export async function streamChat(
       debug: Boolean(options.debug),
       filters: options.filters,
       conversation_id: options.conversation_id ?? null,
+      mode: options.mode ?? null,
+      rerun: Boolean(options.rerun),
+      mentioned_doc_ids: options.mentioned_doc_ids ?? [],
+      tags: options.tags ?? [],
+      scoped_doc_ids: options.scoped_doc_ids ?? [],
     }),
   });
 
@@ -205,7 +219,7 @@ export async function streamChat(
         handlers.onScoping?.(payload as ChatScopingInfo);
       }
       if (event === "meta") {
-        handlers.onMeta?.(payload as any);
+        handlers.onMeta?.(payload as ChatMeta);
       }
       if (event === "debug") {
         handlers.onDebug?.(payload as RetrievalDebugInfo);
@@ -227,6 +241,27 @@ export async function fetchConversations(): Promise<Conversation[]> {
 export async function fetchConversation(conversationId: string): Promise<Conversation> {
   const response = await fetch(`${API_URL}/conversations/${conversationId}`, { cache: "no-store" });
   return readJson<Conversation>(response);
+}
+
+export async function fetchWorkspaces(): Promise<Workspace[]> {
+  const response = await fetch(`${API_URL}/workspaces`, { cache: "no-store" });
+  return readJson<Workspace[]>(response);
+}
+
+export async function createWorkspace(name: string, description = ""): Promise<Workspace> {
+  const response = await fetch(`${API_URL}/workspaces`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, description }),
+  });
+  return readJson<Workspace>(response);
+}
+
+export async function selectWorkspace(workspaceId: string): Promise<Workspace> {
+  const response = await fetch(`${API_URL}/workspaces/${workspaceId}/select`, {
+    method: "POST",
+  });
+  return readJson<Workspace>(response);
 }
 
 export async function createConversation(title?: string): Promise<Conversation> {

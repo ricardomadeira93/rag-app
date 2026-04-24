@@ -55,6 +55,7 @@ class ChromaVectorStore:
                     # because ChromaDB does not accept None values in metadata.
                     "page": chunk_metas[index].page if chunk_metas and chunk_metas[index].page is not None else -1,
                     "offset": chunk_metas[index].offset if chunk_metas else 0,
+                    "parent_id": chunk_metas[index].parent_id if chunk_metas and chunk_metas[index].parent_id else "",
                 }
             )
             for index in range(len(chunks))
@@ -95,6 +96,18 @@ class ChromaVectorStore:
     def count(self) -> int:
         return self._get_collection().count()
 
+    def get_all_chunks(self, filters: dict[str, Any] | None = None) -> dict[str, Any]:
+        collection = self._get_collection()
+        query_args: dict[str, Any] = {
+            "include": ["documents", "metadatas"],
+        }
+        if filters:
+            if len(filters) == 1:
+                query_args["where"] = filters
+            else:
+                query_args["where"] = {"$and": [{key: value} for key, value in filters.items()]}
+        return collection.get(**query_args)
+
     def _get_collection(self) -> Any:
         return self.client.get_or_create_collection(name=self.collection_name, metadata={"hnsw:space": "cosine"})
 
@@ -127,6 +140,7 @@ class ChromaVectorStore:
                     created_at=str(metadata.get("created_at")) if metadata.get("created_at") else None,
                     source_type=str(metadata.get("source_type", "upload")),
                     doc_type=str(metadata.get("doc_type", "file")),
+                    parent_id=str(metadata.get("parent_id")) if metadata.get("parent_id") else None,
                 )
             )
         return sources

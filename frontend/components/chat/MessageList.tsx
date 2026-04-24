@@ -6,8 +6,7 @@ import Link from "next/link";
 import { Fragment, useState, useEffect } from "react";
 
 import { MessageBlock } from "@/components/chat/MessageBlock";
-import { SourceCard } from "@/components/SourceCard";
-import type { ChatMessage, DocumentRecord } from "@/lib/types";
+import { QUICK_MODE_PROMPTS, type ChatMessage, type DocumentRecord, type ResponseMode } from "@/lib/types";
 
 type MessageListProps = {
   messages: ChatMessage[];
@@ -15,11 +14,14 @@ type MessageListProps = {
   workspaceName?: string;
   suggestions: string[];
   recentDocuments: DocumentRecord[];
+  allDocuments: DocumentRecord[];
   onCopyAssistant: (index: number) => void;
   onRegenerate: (index: number) => void;
   onSaveAssistant: (index: number) => void;
   onSuggestionClick: (value: string) => void;
   onRate?: (index: number, rating: 1 | -1) => void;
+  onModePromptClick: (mode: ResponseMode, value: string) => void;
+  onSwitchMessageMode: (index: number, mode: ResponseMode) => void;
 };
 
 export function MessageList({
@@ -28,10 +30,13 @@ export function MessageList({
   workspaceName = "Workspace",
   suggestions,
   recentDocuments,
+  allDocuments,
   onCopyAssistant,
   onRegenerate,
   onSuggestionClick,
   onRate,
+  onModePromptClick,
+  onSwitchMessageMode,
 }: MessageListProps) {
   const [hintsDismissed, setHintsDismissed] = useState(true); // default true to avoid hydration flash
   
@@ -65,6 +70,22 @@ export function MessageList({
                 {suggestion}
               </button>
             ))}
+          </div>
+
+          <div className="mt-6 w-full">
+            <p className="mb-2 text-[12px] text-[var(--text-muted)]">Or try a specific mode:</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {Object.entries(QUICK_MODE_PROMPTS).map(([mode, prompt]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onModePromptClick(mode as ResponseMode, prompt)}
+                  className="rounded-full border border-[var(--border-soft)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+                >
+                  {mode === "action_items" ? "Action items" : mode === "gaps" ? "Find gaps" : mode[0].toUpperCase() + mode.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
 
           {recentDocuments.length > 0 ? (
@@ -124,11 +145,13 @@ export function MessageList({
           <MessageBlock
             kind={message.role === "user" ? "user" : "assistant"}
             message={message}
+            allDocuments={allDocuments}
             isStreaming={isStreaming && message.role === "assistant" && index === messages.length - 1}
             onCopy={message.role === "assistant" ? () => onCopyAssistant(index) : undefined}
             onRegenerate={message.role === "assistant" ? () => onRegenerate(index) : undefined}
             onSave={message.role === "assistant" ? () => undefined : undefined}
             onRate={message.role === "assistant" && onRate ? (rating: 1 | -1) => onRate(index, rating) : undefined}
+            onSwitchMode={message.role === "assistant" ? (mode: ResponseMode) => onSwitchMessageMode(index, mode) : undefined}
           />
 
           {message.role === "assistant" && index === messages.length - 1 ? (

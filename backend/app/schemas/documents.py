@@ -32,6 +32,8 @@ class DocumentRecord(BaseModel):
     document_type: str | None = None
     topics: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)  # user-defined tags for organization
+    related_docs: list[dict] = Field(default_factory=list)
+    conflicting_docs: list[dict] = Field(default_factory=list)
     # Status tracking — defaults to "indexed" so pre-existing records need no migration
     status: DocumentStatus = "indexed"
     indexed_at: str | None = None
@@ -67,6 +69,14 @@ class UploadResponse(BaseModel):
 class ReindexResponse(BaseModel):
     indexed_documents: int
     embedding_signature: EmbeddingSignature
+
+class AddEdgeRequest(BaseModel):
+    target_doc_id: str
+    relationship_type: str
+    description: str | None = None
+
+class EdgeListResponse(BaseModel):
+    items: list[dict] # We can just dump EdgeDicts or import DocumentEdge inside routes
 
 
 class DeleteDocumentResponse(BaseModel):

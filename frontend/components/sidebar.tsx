@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Briefcase,
   ChevronRight,
   LayoutDashboard,
   Library,
@@ -21,12 +22,14 @@ import { ConversationContextMenu } from "@/components/chat/ConversationContextMe
 import {
   fetchConversations,
   fetchSettings,
+  fetchWorkspaces,
   deleteConversation,
   renameConversation,
+  selectWorkspace,
   togglePin,
   fetchSources,
 } from "@/lib/api";
-import type { Conversation } from "@/lib/types";
+import type { Conversation, Workspace } from "@/lib/types";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -46,6 +49,9 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [workspaceName, setWorkspaceName] = useState("Local RAG");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>("default");
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chatsOpen, setChatsOpen] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -55,8 +61,14 @@ export function Sidebar() {
 
   useEffect(() => {
     void fetchSettings()
-      .then((settings) => setWorkspaceName(settings.workspace_name || "Local RAG"))
+      .then((settings) => {
+        setWorkspaceName(settings.workspace_name || "Local RAG");
+        setActiveWorkspaceId(settings.current_workspace_id || "default");
+      })
       .catch(() => null);
+    void fetchWorkspaces()
+      .then((items) => setWorkspaces(items))
+      .catch(() => setWorkspaces([]));
     void fetchConversations()
       .then((items) => setConversations(items))
       .catch(() => setConversations([]));
@@ -74,6 +86,17 @@ export function Sidebar() {
     [conversations],
   );
   const initial = workspaceName.trim().charAt(0).toUpperCase() || "L";
+
+  async function handleWorkspaceSelect(workspaceId: string) {
+    try {
+      const selected = await selectWorkspace(workspaceId);
+      setActiveWorkspaceId(selected.id);
+      setWorkspaceMenuOpen(false);
+      window.location.href = "/dashboard";
+    } catch {
+      // Ignore
+    }
+  }
 
   async function handleDeleteChat() {
     if (!confirmDeleteId) return;
@@ -159,13 +182,19 @@ export function Sidebar() {
       <div className="flex h-full flex-col px-3 py-4">
         <div className="flex items-start justify-between gap-2 px-2">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-semibold text-white">
-              {initial}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{workspaceName || "Local RAG"}</p>
-              <p className="text-[11px] text-[var(--text-muted)]">Workspace</p>
-            </div>
+            <button
+              type="button"
+              onClick={() => setWorkspaceMenuOpen((current) => !current)}
+              className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-1 text-left hover:bg-[var(--bg-subtle)]"
+            >
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-semibold text-white">
+                {initial}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{workspaceName || "Local RAG"}</p>
+                <p className="text-[11px] text-[var(--text-muted)]">Workspace</p>
+              </div>
+            </button>
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
@@ -180,6 +209,31 @@ export function Sidebar() {
             </button>
           </div>
         </div>
+
+        <AnimatePresence>
+          {workspaceMenuOpen ? (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="mt-3 overflow-hidden rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)]"
+            >
+              {workspaces.map((workspace) => (
+                <button
+                  key={workspace.id}
+                  type="button"
+                  onClick={() => void handleWorkspaceSelect(workspace.id)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] ${
+                    workspace.id === activeWorkspaceId ? "bg-[var(--accent-light)] text-[var(--accent-text)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]"
+                  }`}
+                >
+                  <Briefcase className="h-3.5 w-3.5" />
+                  <span className="truncate">{workspace.name}</span>
+                </button>
+              ))}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
         <nav className="mt-6 space-y-1">
           {navigation.map((item) => {

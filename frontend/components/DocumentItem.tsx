@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle, Loader2, MoreHorizontal, RefreshCw, Trash2, XCircle, Mail, Hash, FileBox, Github } from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader2, MoreHorizontal, RefreshCw, Trash2, XCircle, Mail, Hash, FileBox, Github } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -72,9 +72,22 @@ export function DocumentItem({
         )}
         
         <div className="flex min-w-0 flex-col gap-0.5 justify-center">
-          <span className="truncate text-[13px] text-[var(--text-primary)]" title={document.filename}>
-            {document.filename}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[13px] text-[var(--text-primary)]" title={document.filename}>
+              {document.filename}
+            </span>
+            {document.conflicting_docs.length > 0 ? (
+              <Link
+                href={`/chat?documents=${document.id},${document.conflicting_docs[0]?.doc_id}&prompt=${encodeURIComponent(`Do ${document.filename} and ${document.conflicting_docs[0]?.filename} contradict each other?`)}`}
+                onClick={(event) => event.stopPropagation()}
+                title={`This document may conflict with ${document.conflicting_docs[0]?.filename}`}
+                className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                !
+              </Link>
+            ) : null}
+          </div>
           {document.tags && document.tags.length > 0 ? (
             <TagPills tags={document.tags} />
           ) : null}
@@ -142,6 +155,24 @@ export function DocumentItem({
             <div className="mx-2 mt-1 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-4">
               <div className="grid gap-4 md:grid-cols-[1fr_180px]">
                 <div className="space-y-4">
+                  {document.conflicting_docs.length > 0 ? (
+                    <div>
+                      <p className="section-label">Potential conflicts</p>
+                      <div className="mt-2 space-y-2">
+                        {document.conflicting_docs.map((conflict) => (
+                          <Link
+                            key={`${conflict.doc_id}-${conflict.reason}`}
+                            href={`/chat?documents=${document.id},${conflict.doc_id}&prompt=${encodeURIComponent(`Find conflicts between ${document.filename} and ${conflict.filename}`)}`}
+                            className="block rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <div className="font-medium">{conflict.filename}</div>
+                            {conflict.reason ? <div className="mt-1">{conflict.reason}</div> : null}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div>
                     <p className="section-label">Tags</p>
                     <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
@@ -172,6 +203,24 @@ export function DocumentItem({
                           <span key={topic} className="badge">
                             {topic}
                           </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {document.related_docs.length > 0 ? (
+                    <div>
+                      <p className="section-label">Related documents</p>
+                      <div className="mt-2 space-y-2">
+                        {document.related_docs.map((related) => (
+                          <Link
+                            key={related.doc_id}
+                            href={`/documents/${related.doc_id}`}
+                            className="flex items-center justify-between rounded-lg border border-[var(--border-soft)] bg-[var(--bg-surface)] px-3 py-2 text-[12px] text-[var(--text-secondary)]"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <span className="truncate">{related.filename}</span>
+                            <span>{Math.round((related.similarity ?? 0) * 100)}%</span>
+                          </Link>
                         ))}
                       </div>
                     </div>

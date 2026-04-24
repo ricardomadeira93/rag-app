@@ -25,7 +25,8 @@ class EnvironmentSettings(BaseSettings):
 
     data_root: Path = Field(default_factory=lambda: Path(__file__).resolve().parents[2] / DATA_DIR_NAME)
     ollama_base_url: str = "http://host.docker.internal:11434"
-    default_whisper_model: str = "small"
+    ollama_keep_alive: str = "5m"
+    default_whisper_model: str = "base"
 
     @property
     def uploads_dir(self) -> Path:
@@ -40,12 +41,29 @@ class EnvironmentSettings(BaseSettings):
         return self.data_root / CHROMA_DIR_NAME
 
     @property
+    def workspaces_dir(self) -> Path:
+        return self.data_root / "workspaces"
+
+    @property
     def settings_file(self) -> Path:
         return self.data_root / SETTINGS_FILE_NAME
 
     @property
     def documents_file(self) -> Path:
         return self.data_root / DOCUMENTS_FILE_NAME
+
+    def workspace_dir(self, workspace_id: str) -> Path:
+        return self.workspaces_dir / workspace_id
+
+    def workspace_settings_file(self, workspace_id: str) -> Path:
+        return self.workspace_dir(workspace_id) / SETTINGS_FILE_NAME
+
+    def workspace_documents_file(self, workspace_id: str) -> Path:
+        return self.workspace_dir(workspace_id) / DOCUMENTS_FILE_NAME
+
+    @property
+    def active_workspace_file(self) -> Path:
+        return self.data_root / "active_workspace.txt"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -15,7 +15,7 @@ from app.schemas.settings import PersistedSettings
 from app.services.document_service import DocumentService
 from app.services.embeddings.service import EmbeddingService
 from app.services.enrichment_service import EnrichmentService
-from app.services.ingestion.chunking import ChunkWithMeta, split_text_with_meta, split_text_structural
+from app.services.ingestion.chunking import ChunkWithMeta, split_text_parent_child
 from app.services.ingestion.extractors import TextExtractionService
 from app.services.vectorstore.chroma_store import ChromaVectorStore
 from app.services.vectorstore.bm25_store import BM25Store
@@ -38,6 +38,7 @@ class IngestionPipeline:
         self.enrichment_service = enrichment_service
         self.vector_store = vector_store
         self.bm25_store = bm25_store
+        self.chunking_db_path = env.data_root / "chunks.db"
 
     async def ingest_uploads(
         self,
@@ -225,22 +226,45 @@ class IngestionPipeline:
 
         enrichment = await self.enrichment_service.enrich(extracted.text)
 
-        if extracted.file_type == "markdown":
-            chunk_metas: list[ChunkWithMeta] = split_text_structural(
-                extracted.text,
-                chunk_size=settings.chunk_size,
-                overlap=settings.chunk_overlap,
-                page_offsets=extracted.page_offsets,
-            )
-        else:
-            chunk_metas: list[ChunkWithMeta] = split_text_with_meta(
-                extracted.text,
-                chunk_size=settings.chunk_size,
-                overlap=settings.chunk_overlap,
-                page_offsets=extracted.page_offsets,
-            )
-        if not chunk_metas:
+        # Use Parent-Child Splitting
+        parent_child_groups = split_text_parent_child(
+            extracted.text,
+            document_id=original_filename, # or we use checksum later, but we need ID now
+            parent_size=2000,
+            child_size=settings.chunk_size,
+            overlap=settings.chunk_overlap,
+            page_offsets=extracted.page_offsets,
+        )
+
+        if not parent_child_groups:
             raise ValueError(f"No chunks were produced for {original_filename}")
+
+        # Flatten children for contextualization and embedding
+        chunk_metas: list[ChunkWithMeta] = []
+        parent_chunk_map: list[dict] = []
+        child_to_parent: dict[int, str] = {}
+        
+        checksum = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        document_id = checksum
+
+        # Re-assign parent IDs with the actual document_id
+        for i, group in enumerate(parent_child_groups):
+            pid = f"{document_id}:parent:{i}"
+            parent_chunk_map.append({"id": pid, "document_id": document_id, "content": group.parent_text})
+            for child in group.children:
+                child.chunk_index = len(chunk_metas)
+                chunk_metas.append(child)
+                child_to_parent[child.chunk_index] = pid
+
+        # Save Parents to DB
+        from app.services.chunking_db import get_chunking_db
+        async with get_chunking_db(self.chunking_db_path) as db:
+            for p in parent_chunk_map:
+                await db.execute(
+                    "INSERT INTO parent_chunks (id, document_id, content) VALUES (?, ?, ?)",
+                    (p["id"], p["document_id"], p["content"])
+                )
+            await db.commit()
 
         # Anthropic's Contextual Retrieval
         # We loop through the orphaned chunks and ask the Enrichment AI to sew them 
@@ -264,8 +288,6 @@ class IngestionPipeline:
 
         chunks = [cm.text for cm in chunk_metas]
 
-        checksum = hashlib.sha256(source_path.read_bytes()).hexdigest()
-        document_id = checksum
         extracted_text_path = self.env.processed_dir / f"{document_id}.txt"
         extracted_text_path.write_text(extracted.text, encoding="utf-8")
         enrichment_path = self.env.processed_dir / f"{document_id}.enrichment.json"
@@ -312,6 +334,7 @@ class IngestionPipeline:
                 "document_type_normalized": (document.document_type or "").strip().lower(),
                 "page": chunk_metas[index].page if chunk_metas and chunk_metas[index].page is not None else -1,
                 "offset": chunk_metas[index].offset if chunk_metas else 0,
+                "parent_id": child_to_parent[index] if index in child_to_parent else "",
                 "created_at": document.created_at,
                 "source_type": document.source_type,
                 "doc_type": document.doc_type,
@@ -321,4 +344,55 @@ class IngestionPipeline:
         self.bm25_store.upsert_chunks(document.id, chunk_ids, chunks, metadatas)
         
         self.document_service.upsert_document(document)
+        asyncio.create_task(self._find_related_documents(document, settings))
         return document
+
+    async def _find_related_documents(self, document: DocumentRecord, settings: PersistedSettings) -> None:
+        if not document.summary or not self.document_service.get_document(document.id):
+            return
+
+        try:
+            query_embedding = await self.embeddings.embed_query(settings, document.summary)
+            results = self.vector_store.query(
+                query_embedding=query_embedding,
+                top_k=12,
+                filters=None,
+            )
+        except Exception:
+            return
+
+        related_docs: list[dict] = []
+        seen: set[str] = set()
+
+        for result in results:
+            if result.document_id == document.id or result.document_id in seen:
+                continue
+            if result.similarity_score < 0.65:
+                continue
+            seen.add(result.document_id)
+            related_docs.append(
+                {
+                    "doc_id": result.document_id,
+                    "filename": result.filename,
+                    "similarity": round(result.similarity_score, 3),
+                }
+            )
+            if len(related_docs) >= 5:
+                break
+
+        self.document_service.update_related_docs(document.id, related_docs)
+
+        for related in related_docs:
+            related_document = self.document_service.get_document(str(related["doc_id"]))
+            if not related_document:
+                continue
+            existing = [item for item in related_document.related_docs if item.get("doc_id") != document.id]
+            existing.append(
+                {
+                    "doc_id": document.id,
+                    "filename": document.filename,
+                    "similarity": related["similarity"],
+                }
+            )
+            existing.sort(key=lambda item: float(item.get("similarity", 0.0)), reverse=True)
+            self.document_service.update_related_docs(related_document.id, existing[:5])

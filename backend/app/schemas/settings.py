@@ -31,6 +31,7 @@ class EmbeddingSignature(BaseModel):
 
 
 class PersistedSettings(BaseModel):
+    current_workspace_id: str = "default"
     developer_mode: bool = False
     llm_provider: LLMProviderLiteral = "ollama"
     llm_model: str = "llama3.1:8b"

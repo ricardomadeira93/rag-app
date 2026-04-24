@@ -2,6 +2,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from app.services.query_classifier import ResponseMode
+
 
 class ChatMessage(BaseModel):
     role: Literal["system", "user", "assistant"]
@@ -11,6 +13,12 @@ class ChatMessage(BaseModel):
 class MetaPayload(BaseModel):
     confidence: Literal["high", "medium", "low", "none"]
     answer_type: str
+    mode_used: ResponseMode = "answer"
+    mode_auto_detected: bool = True
+    analyzed_documents: int | None = None
+    total_documents: int | None = None
+    truncated: bool = False
+    message: str | None = None
 
 class SourceCitation(BaseModel):
     id: str
@@ -22,6 +30,7 @@ class SourceCitation(BaseModel):
     similarity_score: float = 0.0
     similarity_percent: str = ""
     chunk_index: int
+    parent_id: str | None = None
     page: int | None = None    # 1-based page number for PDFs; null for other file types
     offset: int = 0            # character offset of the chunk start in the source text
     created_at: str | None = None
@@ -69,6 +78,11 @@ class ChatRequest(BaseModel):
     filters: ChatFilters | None = None
     debug: bool = False
     conversation_id: str | None = None  # when set, messages are persisted to this conversation
+    mode: ResponseMode | None = None
+    rerun: bool = False
+    mentioned_doc_ids: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    scoped_doc_ids: list[str] = Field(default_factory=list)
 
     @property
     def latest_user_message(self) -> Optional[str]:

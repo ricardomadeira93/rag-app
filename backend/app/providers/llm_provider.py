@@ -66,16 +66,17 @@ class LiteLLMChatProvider:
 class OllamaChatProvider:
     model: str
     base_url: str
+    keep_alive: str | None = None
 
     async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[str]:
         payload_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
-        client = build_ollama_client(self.base_url)
+        client = build_ollama_client(self.base_url, keep_alive=self.keep_alive)
         async for token in client.stream_chat(messages=payload_messages, model=self.model):
             yield token
 
     async def generate_json(self, messages: list[ChatMessage]) -> str:
         payload_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
-        client = build_ollama_client(self.base_url)
+        client = build_ollama_client(self.base_url, keep_alive=self.keep_alive)
         return await client.chat(messages=payload_messages, model=self.model, format="json")
 
 
@@ -90,7 +91,11 @@ def build_llm_provider(settings: PersistedSettings, env: EnvironmentSettings, us
     model_to_use = settings.enrichment_model if use_enrichment_model else settings.llm_model
 
     if settings.llm_provider == "ollama":
-        return OllamaChatProvider(model=model_to_use, base_url=base_url or env.ollama_base_url)
+        return OllamaChatProvider(
+            model=model_to_use,
+            base_url=base_url or env.ollama_base_url,
+            keep_alive=env.ollama_keep_alive,
+        )
 
     return LiteLLMChatProvider(
         provider=settings.llm_provider,

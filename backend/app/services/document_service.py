@@ -6,17 +6,21 @@ from typing import Literal
 
 from app.core.config import EnvironmentSettings
 from app.schemas.documents import DocumentRecord, DocumentStatus
+from app.services.workspace_service import WorkspaceService
 
 
 class DocumentService:
-    def __init__(self, env: EnvironmentSettings) -> None:
+    def __init__(self, env: EnvironmentSettings, workspace_service: WorkspaceService) -> None:
         self.env = env
+        self.workspace_service = workspace_service
 
     def list_documents(self) -> list[DocumentRecord]:
-        if not self.env.documents_file.exists():
+        documents_file = self.env.workspace_documents_file(self.workspace_service.get_active_workspace_id_sync())
+        documents_file.parent.mkdir(parents=True, exist_ok=True)
+        if not documents_file.exists():
             self._write([])
             return []
-        payload = json.loads(self.env.documents_file.read_text(encoding="utf-8"))
+        payload = json.loads(documents_file.read_text(encoding="utf-8"))
         return [DocumentRecord.model_validate(item) for item in payload]
 
     def get_document(self, document_id: str) -> DocumentRecord | None:
@@ -99,6 +103,20 @@ class DocumentService:
         document.tags = [t.strip().lower() for t in tags if t.strip()]
         return self.upsert_document(document)
 
+    def update_related_docs(self, document_id: str, related_docs: list[dict]) -> DocumentRecord | None:
+        document = self.get_document(document_id)
+        if document is None:
+            return None
+        document.related_docs = related_docs
+        return self.upsert_document(document)
+
+    def update_conflicting_docs(self, document_id: str, conflicting_docs: list[dict]) -> DocumentRecord | None:
+        document = self.get_document(document_id)
+        if document is None:
+            return None
+        document.conflicting_docs = conflicting_docs
+        return self.upsert_document(document)
+
     def list_all_tags(self) -> list[str]:
         all_tags: set[str] = set()
         for doc in self.list_documents():
@@ -107,4 +125,6 @@ class DocumentService:
 
     def _write(self, documents: list[DocumentRecord]) -> None:
         payload = [document.model_dump() for document in documents]
-        self.env.documents_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        documents_file = self.env.workspace_documents_file(self.workspace_service.get_active_workspace_id_sync())
+        documents_file.parent.mkdir(parents=True, exist_ok=True)
+        documents_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")

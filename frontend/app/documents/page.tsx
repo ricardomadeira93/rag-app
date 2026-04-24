@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { RefreshCw, Search, Upload } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { DocumentItem } from "@/components/DocumentItem";
@@ -29,6 +29,7 @@ const fadeUp = {
 
 export default function DocumentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +46,13 @@ export default function DocumentsPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    const tag = searchParams.get("tag");
+    if (tag) {
+      setSearchTerm(tag);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const hasActiveProcessing = documents.some(

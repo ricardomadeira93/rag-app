@@ -1,21 +1,46 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
 import { StatusBanner } from "@/components/status-banner";
-import { fetchDocuments, fetchSettings, saveSettings, streamChat, createConversation, fetchMessages, fetchConversation, toggleConversationPin } from "@/lib/api";
-import type { ChatMessage as ChatMessageRecord, DocumentRecord, RetrievalDebugInfo, Settings, SourceCitation, Conversation } from "@/lib/types";
-import { Search, Pin, PinOff, X } from "lucide-react";
+import {
+  createConversation,
+  fetchConversation,
+  fetchDocuments,
+  fetchMemories,
+  fetchMessages,
+  fetchSettings,
+  fetchSources,
+  reindexDocuments,
+  saveSettings,
+  streamChat,
+  togglePin,
+} from "@/lib/api";
+import type {
+  ChatMessage as ChatMessageRecord,
+  ChatMeta,
+  ComposerSubmitPayload,
+  Conversation,
+  DocumentRecord,
+  ResponseMode,
+  RetrievalDebugInfo,
+  Settings,
+  SourceRecord,
+  SourceCitation,
+} from "@/lib/types";
+import { Brain, Search, Pin, PinOff, X } from "lucide-react";
 
 export function ChatShell({ conversationId }: { conversationId?: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [messages, setMessages] = useState<ChatMessageRecord[]>([]);
   const [input, setInput] = useState("");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [sources, setSources] = useState<SourceRecord[]>([]);
   const [attachedDocuments, setAttachedDocuments] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,15 +49,33 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMode, setSelectedMode] = useState<ResponseMode | null>(null);
+  const [scopePickerSignal, setScopePickerSignal] = useState(0);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [memoryPanelOpen, setMemoryPanelOpen] = useState(false);
+  const [memories, setMemories] = useState<Array<{ id: string; fact: string }>>([]);
 
   useEffect(() => {
-    void Promise.all([fetchSettings(), fetchDocuments()])
-      .then(([nextSettings, nextDocuments]) => {
+    void Promise.all([fetchSettings(), fetchDocuments(), fetchSources().catch(() => [])])
+      .then(([nextSettings, nextDocuments, nextSources]) => {
         setSettings(nextSettings);
         setDocuments(nextDocuments);
+        setSources(nextSources);
       })
       .catch((reason: Error) => setError(reason.message));
   }, []);
+
+  useEffect(() => {
+    const prompt = searchParams.get("prompt");
+    const documentIdsParam = searchParams.get("documents");
+    if (prompt) {
+      setInput(prompt);
+    }
+    if (documentIdsParam && documents.length > 0) {
+      const ids = documentIdsParam.split(",").filter(Boolean);
+      setAttachedDocuments(documents.filter((document) => ids.includes(document.id)));
+    }
+  }, [documents, searchParams]);
 
   // Fetch messages if a conversation ID is provided
   useEffect(() => {
@@ -46,6 +89,8 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
           role: msg.role,
           content: msg.content,
           sources: msg.sources,
+          modeUsed: msg.mode_used ?? undefined,
+          modeAutoDetected: msg.mode_auto_detected ?? undefined,
           debug: null, // Server doesn't persist debug info
           rating: msg.rating
         })));
@@ -86,8 +131,17 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     ];
   }, [settings?.workspace_description, settings?.workspace_name]);
 
-  async function sendMessage(content: string) {
-    if (!content.trim()) {
+  async function sendMessage(
+    submission: ComposerSubmitPayload,
+    options?: {
+      mode?: ResponseMode | null;
+      baseMessages?: ChatMessageRecord[];
+      appendUserMessage?: boolean;
+      rerun?: boolean;
+    },
+  ) {
+    const content = submission.text.trim();
+    if (!content) {
       return;
     }
 
@@ -112,7 +166,13 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
       }
     }
 
-    const requestMessages: ChatMessageRecord[] = [...messages, { role: "user", content }];
+    const baseMessages = options?.baseMessages ?? messages;
+    const appendUserMessage = options?.appendUserMessage ?? true;
+    const mode = options?.mode ?? selectedMode;
+    const requestMessages: ChatMessageRecord[] = appendUserMessage
+      ? [...baseMessages, { role: "user", content }]
+      : [...baseMessages];
+
     setMessages([...requestMessages, { role: "assistant", content: "", sources: [], debug: null, isThinking: true }]);
     setInput("");
     setLoading(true);
@@ -121,7 +181,16 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     try {
       await streamChat(
         requestMessages.map((message) => ({ role: message.role, content: message.content })),
-        { debug: settings?.developer_mode, conversation_id: targetConvId },
+        {
+          debug: settings?.developer_mode,
+          conversation_id: targetConvId,
+          mode,
+          rerun: Boolean(options?.rerun),
+          filters: attachedDocuments.length > 0 ? { document_ids: attachedDocuments.map((document) => document.id) } : undefined,
+          mentioned_doc_ids: submission.mentionedDocIds,
+          tags: submission.tags,
+          scoped_doc_ids: attachedDocuments.map((document) => document.id),
+        },
         {
           onToken(token) {
             setMessages((current) => appendToAssistant(current, token));
@@ -147,8 +216,8 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     }
   }
 
-  async function handleSubmit() {
-    await sendMessage(input.trim());
+  async function handleSubmit(submission: ComposerSubmitPayload) {
+    await sendMessage(submission);
   }
 
   function handleCopyAssistant(index: number) {
@@ -169,7 +238,23 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     }
 
     setMessages((current) => current.slice(0, index));
-    void sendMessage(previousUser.content);
+    void sendMessage({ text: previousUser.content, mentionedDocIds: [], tags: [] });
+  }
+
+  function handleSwitchMessageMode(index: number, mode: ResponseMode) {
+    const history = messages.slice(0, index);
+    const previousUser = [...history].reverse().find((message) => message.role === "user");
+    if (!previousUser) {
+      return;
+    }
+
+    setMessages(history);
+    void sendMessage({ text: previousUser.content, mentionedDocIds: [], tags: [] }, {
+      mode,
+      baseMessages: history,
+      appendUserMessage: false,
+      rerun: true,
+    });
   }
 
   const handleRate = async (index: number, rating: 1 | -1) => {
@@ -201,7 +286,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     try {
       const nextPinned = !conversationMeta.pinned;
       setConversationMeta({ ...conversationMeta, pinned: nextPinned });
-      await toggleConversationPin(activeConversationId, nextPinned);
+      await togglePin(activeConversationId);
     } catch {
       // Revert on error
       setConversationMeta({ ...conversationMeta, pinned: conversationMeta.pinned });
@@ -223,6 +308,94 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     } catch (reason) {
       setError(`Failed to update ${String(key)}`);
     }
+  }
+
+  async function handleExportConversation() {
+    const content = messages
+      .map((message) => `## ${message.role === "user" ? "User" : "Assistant"}\n\n${message.content}`)
+      .join("\n\n");
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${conversationMeta?.title || "conversation"}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function openMemoryPanel() {
+    try {
+      const items = await fetchMemories();
+      setMemories(items.map((item) => ({ id: item.id, fact: item.fact })));
+      setMemoryPanelOpen(true);
+    } catch {
+      setError("Failed to load memory");
+    }
+  }
+
+  async function handleCommand(commandId: string) {
+    if (commandId === "upload") {
+      router.push("/documents/upload");
+      setInput("");
+      return;
+    }
+    if (commandId === "documents") {
+      router.push("/documents");
+      setInput("");
+      return;
+    }
+    if (commandId === "sources") {
+      router.push("/sources");
+      setInput("");
+      return;
+    }
+    if (commandId === "settings") {
+      router.push("/settings");
+      setInput("");
+      return;
+    }
+    if (commandId === "clear") {
+      setClearConfirmOpen(true);
+      return;
+    }
+    if (commandId === "export") {
+      await handleExportConversation();
+      return;
+    }
+    if (commandId === "scope") {
+      setScopePickerSignal((current) => current + 1);
+      return;
+    }
+    if (commandId === "memory") {
+      await openMemoryPanel();
+      return;
+    }
+    if (commandId === "reindex") {
+      await reindexDocuments();
+      setError(null);
+      return;
+    }
+    if (commandId === "summarize-all") {
+      setSelectedMode("summary");
+      setInput("Summarize all my documents");
+      return;
+    }
+    if (commandId === "compare") {
+      setSelectedMode(null);
+      setInput("Compare all my documents");
+      return;
+    }
+    if (commandId === "contradictions") {
+      setSelectedMode(null);
+      setInput("Do my documents contradict each other?");
+      return;
+    }
+    if (commandId === "summary") setSelectedMode("summary");
+    if (commandId === "extract") setSelectedMode("extract");
+    if (commandId === "actions") setSelectedMode("action_items");
+    if (commandId === "timeline") setSelectedMode("timeline");
+    if (commandId === "draft") setSelectedMode("draft");
+    if (commandId === "gaps") setSelectedMode("gaps");
   }
 
   return (
@@ -308,15 +481,68 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
           workspaceName={settings?.workspace_name || "Workspace"}
           suggestions={suggestions}
           recentDocuments={recentDocuments}
+          allDocuments={documents}
           onCopyAssistant={handleCopyAssistant}
           onRegenerate={handleRegenerate}
           onSaveAssistant={() => undefined}
           onSuggestionClick={setInput}
           onRate={handleRate}
+          onModePromptClick={(mode, value) => {
+            setSelectedMode(mode);
+            setInput(value);
+          }}
+          onSwitchMessageMode={handleSwitchMessageMode}
         />
 
         <div ref={scrollAnchorRef} />
       </div>
+
+      {clearConfirmOpen ? (
+        <div className="pointer-events-none fixed right-0 bottom-[112px] left-0 z-30 flex justify-center px-4">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] px-4 py-3 text-[12px] shadow-[var(--shadow-soft)]">
+            <span>Clear conversation?</span>
+            <button
+              type="button"
+              onClick={() => {
+                setMessages([]);
+                setActiveConversationId(null);
+                setConversationMeta(null);
+                setClearConfirmOpen(false);
+                router.push("/chat");
+              }}
+              className="rounded-md bg-[var(--accent)] px-2 py-1 text-white"
+            >
+              Yes
+            </button>
+            <button type="button" onClick={() => setClearConfirmOpen(false)} className="rounded-md px-2 py-1 text-[var(--text-muted)]">
+              No
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {memoryPanelOpen ? (
+        <div className="fixed top-20 right-4 z-30 w-[320px] rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-soft)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[13px] font-medium text-[var(--text-primary)]">
+              <Brain className="h-4 w-4" />
+              What AI remembers
+            </div>
+            <button type="button" onClick={() => setMemoryPanelOpen(false)} className="text-[var(--text-muted)]">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mt-3 max-h-[320px] space-y-2 overflow-y-auto">
+            {memories.length > 0 ? memories.map((memory) => (
+              <div key={memory.id} className="rounded-lg bg-[var(--bg-subtle)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
+                {memory.fact}
+              </div>
+            )) : (
+              <div className="text-[12px] text-[var(--text-muted)]">No stored memories yet.</div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <ChatInput
         value={input}
@@ -331,8 +557,14 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
         onToggleRouting={(enabled) => void handleSettingChange("semantic_routing_enabled", enabled)}
         attachedDocuments={attachedDocuments}
         availableDocuments={documents}
+        availableSources={sources}
         onRemoveAttachment={removeAttachment}
         onAddAttachment={addAttachment}
+        selectedMode={selectedMode}
+        displayMode={lastAssistantMode(messages)}
+        onModeChange={setSelectedMode}
+        onExecuteCommand={(commandId) => void handleCommand(commandId)}
+        attachmentPickerSignal={scopePickerSignal}
       />
     </div>
   );
@@ -346,10 +578,20 @@ function appendToAssistant(messages: ChatMessageRecord[], token: string) {
   );
 }
 
-function attachMeta(messages: ChatMessageRecord[], meta: { confidence: any; answer_type: string }) {
+function attachMeta(messages: ChatMessageRecord[], meta: ChatMeta) {
   return messages.map((message, index) =>
     index === messages.length - 1 && message.role === "assistant" 
-      ? { ...message, confidence: meta.confidence, answerType: meta.answer_type } 
+      ? {
+          ...message,
+          confidence: meta.confidence,
+          answerType: meta.answer_type,
+          modeUsed: meta.mode_used,
+          modeAutoDetected: meta.mode_auto_detected,
+          analyzedDocuments: meta.analyzed_documents ?? undefined,
+          totalDocuments: meta.total_documents ?? undefined,
+          comparisonTruncated: Boolean(meta.truncated),
+          comparisonMessage: meta.message ?? null,
+        }
       : message,
   );
 }
@@ -364,4 +606,9 @@ function attachDebug(messages: ChatMessageRecord[], debug: RetrievalDebugInfo) {
   return messages.map((message, index) =>
     index === messages.length - 1 && message.role === "assistant" ? { ...message, debug } : message,
   );
+}
+
+function lastAssistantMode(messages: ChatMessageRecord[]): ResponseMode {
+  const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant" && message.modeUsed);
+  return lastAssistant?.modeUsed ?? "answer";
 }

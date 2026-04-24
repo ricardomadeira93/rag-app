@@ -42,9 +42,10 @@ class LiteLLMEmbeddingProvider:
 class OllamaEmbeddingProvider:
     model: str
     base_url: str
+    keep_alive: str | None = None
 
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        client = build_ollama_client(self.base_url)
+        client = build_ollama_client(self.base_url, keep_alive=self.keep_alive)
         embeddings: list[list[float]] = []
         for text in texts:
             embeddings.append(await client.embed(text=text, model=self.model))
@@ -60,7 +61,11 @@ def build_embedding_provider(settings: PersistedSettings, env: EnvironmentSettin
         raise ValueError("OpenAI embeddings require an API key")
 
     if settings.embedding_provider == "ollama":
-        return OllamaEmbeddingProvider(model=settings.embedding_model, base_url=base_url or env.ollama_base_url)
+        return OllamaEmbeddingProvider(
+            model=settings.embedding_model,
+            base_url=base_url or env.ollama_base_url,
+            keep_alive=env.ollama_keep_alive,
+        )
 
     return LiteLLMEmbeddingProvider(
         provider=settings.embedding_provider,

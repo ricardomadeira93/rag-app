@@ -7,8 +7,9 @@ import httpx
 
 
 class OllamaClient:
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, keep_alive: str | None = None) -> None:
         self.base_url = base_url.rstrip("/")
+        self.keep_alive = keep_alive
 
     async def check_status(self) -> dict[str, Any]:
         try:
@@ -32,6 +33,8 @@ class OllamaClient:
         payload = {"model": model, "prompt": prompt, "stream": False}
         if format is not None:
             payload["format"] = format
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -43,11 +46,15 @@ class OllamaClient:
         return str(payload.get("response", ""))
 
     async def stream_generate(self, prompt: str, model: str) -> AsyncIterator[str]:
+        payload = {"model": model, "prompt": prompt, "stream": True}
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
+
         async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/api/generate",
-                json={"model": model, "prompt": prompt, "stream": True},
+                json=payload,
             ) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
@@ -62,6 +69,8 @@ class OllamaClient:
         payload = {"model": model, "messages": messages, "stream": False}
         if format is not None:
             payload["format"] = format
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -74,11 +83,15 @@ class OllamaClient:
         return str(message.get("content", ""))
 
     async def stream_chat(self, messages: list[dict[str, str]], model: str) -> AsyncIterator[str]:
+        payload = {"model": model, "messages": messages, "stream": True}
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
+
         async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/api/chat",
-                json={"model": model, "messages": messages, "stream": True},
+                json=payload,
             ) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
@@ -91,10 +104,14 @@ class OllamaClient:
                         yield str(token)
 
     async def embed(self, text: str, model: str) -> list[float]:
+        payload = {"model": model, "prompt": text}
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.base_url}/api/embeddings",
-                json={"model": model, "prompt": text},
+                json=payload,
             )
             response.raise_for_status()
             payload = response.json()
@@ -110,5 +127,5 @@ class OllamaClient:
         return names
 
 
-def build_ollama_client(base_url: str) -> OllamaClient:
-    return OllamaClient(base_url=base_url)
+def build_ollama_client(base_url: str, keep_alive: str | None = None) -> OllamaClient:
+    return OllamaClient(base_url=base_url, keep_alive=keep_alive)

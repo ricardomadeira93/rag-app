@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass
 
@@ -25,8 +26,11 @@ from app.schemas.documents import (
     ReindexResponse,
     StatusUpdateRequest,
     UploadResponse,
+    AddEdgeRequest,
+    EdgeListResponse,
 )
 from app.schemas.settings import PersistedSettings, SettingsUpdate
+from app.schemas.workspaces import CreateWorkspaceRequest, WorkspaceSummary
 import logging
 
 from app.schemas.storage import DiskUsageResponse, StorageUsageResponse
@@ -44,9 +48,14 @@ logger = logging.getLogger(__name__)
 
 
 from app.services.vectorstore.bm25_store import BM25Store
+from app.services.vectorstore.cross_encoder import CrossEncoderService
+from app.services.workspace_service import WorkspaceService
+
+from app.services.graph_db import GraphDBService
 
 @dataclass
 class ServiceContainer:
+    workspaces: WorkspaceService
     settings: SettingsService
     documents: DocumentService
     ingestion: IngestionPipeline
@@ -55,6 +64,8 @@ class ServiceContainer:
     vector_store: ChromaVectorStore
     memory: "MemoryService"
     bm25_store: BM25Store
+    cross_encoder: CrossEncoderService
+    graph_service: GraphDBService
 
 
 def get_container(request: Request) -> ServiceContainer:
@@ -67,6 +78,27 @@ def ensure_index_compatible(settings: PersistedSettings) -> None:
             status_code=409,
             detail="Embedding settings changed. Re-index documents before uploading or chatting.",
         )
+
+
+@router.get("/workspaces", response_model=list[WorkspaceSummary])
+async def list_workspaces(request: Request) -> list[WorkspaceSummary]:
+    container = get_container(request)
+    return await container.workspaces.list_workspaces()
+
+
+@router.post("/workspaces", response_model=WorkspaceSummary)
+async def create_workspace(request: Request, payload: CreateWorkspaceRequest) -> WorkspaceSummary:
+    container = get_container(request)
+    return await container.workspaces.create_workspace(payload.name, payload.description)
+
+
+@router.post("/workspaces/{workspace_id}/select", response_model=WorkspaceSummary)
+async def select_workspace(request: Request, workspace_id: str) -> WorkspaceSummary:
+    container = get_container(request)
+    workspace = await container.workspaces.select_workspace(workspace_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return workspace
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -92,6 +124,7 @@ async def chat(request: Request, payload: ChatRequest) -> StreamingResponse:
     # Buffers for persistence — populated as the stream passes through
     assistant_tokens: list[str] = []
     final_sources: list[dict] = []
+    final_meta: dict[str, object] = {}
 
     async def stream() -> object:
         try:
@@ -109,6 +142,11 @@ async def chat(request: Request, payload: ChatRequest) -> StreamingResponse:
                         final_sources.extend(data.get("items", []))
                     except Exception:
                         pass
+                elif event.startswith("event: meta"):
+                    try:
+                        final_meta.update(json.loads(event.split("data: ", 1)[1]))
+                    except Exception:
+                        pass
                 yield event
         except ValueError as exc:
             yield sse_event("error", {"message": str(exc)})
@@ -121,22 +159,29 @@ async def chat(request: Request, payload: ChatRequest) -> StreamingResponse:
         if payload.conversation_id and payload.latest_user_message:
             conv_id = payload.conversation_id
             try:
+                if not payload.rerun:
+                    await container.conversations.append_message(
+                        conv_id, "user", payload.latest_user_message, []
+                    )
                 await container.conversations.append_message(
-                    conv_id, "user", payload.latest_user_message, []
-                )
-                await container.conversations.append_message(
-                    conv_id, "assistant", "".join(assistant_tokens), final_sources
+                    conv_id,
+                    "assistant",
+                    "".join(assistant_tokens),
+                    final_sources,
+                    mode_used=str(final_meta.get("mode_used")) if final_meta.get("mode_used") else None,
+                    mode_auto_detected=(
+                        bool(final_meta["mode_auto_detected"])
+                        if "mode_auto_detected" in final_meta
+                        else None
+                    ),
                 )
             except Exception:
                 pass  # persistence failure must never break the chat response
 
             # Extract memories asynchronously (non-blocking, best-effort)
-            try:
-                msgs = [{"role": m.role, "content": m.content} for m in payload.messages[-4:]]
-                msgs.append({"role": "assistant", "content": "".join(assistant_tokens)})
-                await container.memory.extract_and_store(msgs, conv_id, settings)
-            except Exception:
-                pass
+            msgs = [{"role": m.role, "content": m.content} for m in payload.messages[-4:]]
+            msgs.append({"role": "assistant", "content": "".join(assistant_tokens)})
+            asyncio.create_task(container.memory.extract_and_store(msgs, conv_id, settings))
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -202,6 +247,34 @@ async def delete_document(request: Request, document_id: str) -> DeleteDocumentR
     return DeleteDocumentResponse(id=document_id, deleted=True)
 
 
+@router.post("/documents/{document_id}/relationships", response_model=dict)
+async def add_document_relationship(request: Request, document_id: str, payload: AddEdgeRequest) -> dict:
+    container = get_container(request)
+    edge = await container.graph_service.add_edge(
+        source=document_id,
+        target=payload.target_doc_id,
+        rel_type=payload.relationship_type,
+        desc=payload.description
+    )
+    return edge.model_dump()
+
+
+@router.get("/documents/{document_id}/relationships", response_model=EdgeListResponse)
+async def get_document_relationships(request: Request, document_id: str) -> EdgeListResponse:
+    container = get_container(request)
+    edges = await container.graph_service.get_edges(document_id)
+    return EdgeListResponse(items=[e.model_dump() for e in edges])
+
+
+@router.delete("/documents/relationships/{edge_id}")
+async def delete_document_relationship(request: Request, edge_id: str) -> dict:
+    container = get_container(request)
+    success = await container.graph_service.delete_edge(edge_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Edge not found")
+    return {"id": edge_id, "deleted": True}
+
+
 @router.get("/documents/tags")
 async def list_document_tags(request: Request) -> list[str]:
     container = get_container(request)
@@ -258,7 +331,7 @@ async def get_ollama_status(request: Request) -> object:
     container = get_container(request)
     settings = container.settings.get_settings()
     base_url = settings.llm_base_url if settings.llm_provider == "ollama" and settings.llm_base_url else request.app.state.env.ollama_base_url
-    client = build_ollama_client(base_url)
+    client = build_ollama_client(base_url, keep_alive=request.app.state.env.ollama_keep_alive)
     return await client.check_status()
 
 
@@ -310,6 +383,11 @@ async def create_conversation(
     request: Request, payload: CreateConversationRequest
 ) -> ConversationSummary:
     container = get_container(request)
+    settings = container.settings.get_settings()
+    try:
+        await container.memory.summarize_latest_conversation_before_new(settings)
+    except Exception:
+        pass
     return await container.conversations.create_conversation(payload.title)
 
 
@@ -385,7 +463,21 @@ async def rate_message(request: Request, message_id: str, payload: RateMessageRe
 async def list_memories(request: Request) -> list[dict]:
     container = get_container(request)
     memories = await container.memory.list_memories()
-    return [m.model_dump() for m in memories]
+    return [memory.__dict__ for memory in memories]
+
+
+@router.get("/memory/summaries")
+async def list_memory_summaries(request: Request) -> list[dict]:
+    container = get_container(request)
+    summaries = await container.memory.list_summaries()
+    return [summary.__dict__ for summary in summaries]
+
+
+@router.get("/memory/preferences")
+async def list_memory_preferences(request: Request) -> list[dict]:
+    container = get_container(request)
+    preferences = await container.memory.list_preferences()
+    return [preference.__dict__ for preference in preferences]
 
 
 @router.delete("/memories/{memory_id}")

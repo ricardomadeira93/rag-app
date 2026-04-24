@@ -10,6 +10,7 @@ class ChunkWithMeta:
     chunk_index: int
     offset: int       # character start of this chunk in the full text
     page: int | None  # 1-based page number for PDFs; None for other file types
+    parent_id: str | None = None # Used for Parent-Child contextual retrieval
 
 
 def split_text(text: str, chunk_size: int, overlap: int) -> list[str]:
@@ -166,4 +167,55 @@ def _resolve_page(offset: int, page_offsets: list[int]) -> int | None:
     # so the page containing offset is one before that.
     index = bisect.bisect_right(page_offsets, offset) - 1
     return max(index, 0) + 1  # clamp to 0, convert to 1-based
+
+@dataclass
+class ParentChildChunk:
+    parent_id: str
+    parent_text: str
+    children: list[ChunkWithMeta]
+
+def split_text_parent_child(
+    text: str,
+    document_id: str,
+    parent_size: int = 2000,
+    child_size: int = 300,
+    overlap: int = 50,
+    page_offsets: list[int] | None = None,
+) -> list[ParentChildChunk]:
+    if page_offsets is None:
+        page_offsets = []
+
+    # First, split into parents
+    parent_chunks = split_text_structural(text, parent_size, overlap=200, page_offsets=page_offsets)
+
+    results: list[ParentChildChunk] = []
+    
+    for i, p_chunk in enumerate(parent_chunks):
+        parent_id = f"{document_id}:parent:{i}"
+        
+        # Then, slice the parent into smaller children
+        # We don't have page_offsets for the internal slice relative to the whole doc, so we just use overlap
+        child_chunks_meta = split_text_with_meta(p_chunk.text, child_size, overlap, [])
+        
+        # We need to map the internal offset back to the global offset and page
+        children: list[ChunkWithMeta] = []
+        for c, c_chunk in enumerate(child_chunks_meta):
+            global_offset = p_chunk.offset + c_chunk.offset
+            global_page = _resolve_page(global_offset, page_offsets)
+            children.append(ChunkWithMeta(
+                text=c_chunk.text,
+                chunk_index=c, # relative child index
+                offset=global_offset,
+                page=global_page,
+                parent_id=parent_id
+            ))
+            
+        if children:
+            results.append(ParentChildChunk(
+                parent_id=parent_id,
+                parent_text=p_chunk.text,
+                children=children
+            ))
+
+    return results
 

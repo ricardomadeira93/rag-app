@@ -124,5 +124,9 @@ export function matchesSearch(document: DocumentRecord, searchTerm: string): boo
   if (!searchTerm.trim()) {
     return true;
   }
-  return document.filename.toLowerCase().includes(searchTerm.trim().toLowerCase());
+  const query = searchTerm.trim().toLowerCase();
+  return (
+    document.filename.toLowerCase().includes(query) ||
+    document.tags.some((tag) => tag.toLowerCase().includes(query))
+  );
 }

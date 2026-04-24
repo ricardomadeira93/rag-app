@@ -1,443 +1,441 @@
-# Local-First RAG MVP
+# STARK
 
-## Problem Restatement
+> Local-first RAG workspace for chatting with documents, extracting decisions, and drafting grounded answers on your own machine.
 
-This project is a production-structured MVP for a local-first retrieval-augmented generation system. The main constraints are:
+`STARK` is a full-stack local knowledge assistant built around FastAPI, Next.js, ChromaDB, SQLite, and LiteLLM/Ollama. You upload files, the backend extracts and enriches their text, chunks and embeds the content, stores vectors locally, and then serves streamed chat answers grounded in retrieved context. The app is aimed at teams or individual operators who want a private, self-hosted document assistant instead of sending their data to a hosted SaaS.
 
-- Everything important should run on the user's machine.
-- The user can stay fully local with Ollama or switch the generation layer to a cloud provider through LiteLLM.
-- Documents must support PDF, Markdown, audio, and image ingestion.
-- Retrieval must be versioned by embedding provider, embedding model, and embedding version.
-- If the embedding setup changes, re-indexing is mandatory before chat continues.
+## What It Does
 
-Assumptions used in this MVP:
+In plain English:
 
-- This is a single-user local application, so settings and document metadata are stored locally on disk.
-- Chroma runs as an embedded local persistence layer inside the backend service instead of a separate database container.
-- Anthropic is supported as an LLM provider, but embeddings are limited to providers that LiteLLM can use for embedding generation in this MVP: Ollama and OpenAI.
-- PDFs use text extraction through `pypdf`; image-only PDFs are not OCR-processed in this version.
+- You upload files such as PDFs, markdown notes, screenshots, audio recordings, email exports, or Slack exports.
+- The backend converts each file into text using the appropriate extractor.
+- That text is summarized, chunked, embedded, and indexed locally.
+- In chat, the app retrieves relevant chunks and streams an answer backed by those sources.
+- It also supports comparison-style retrieval, persistent cross-session memory, workspaces, structured response modes, and scoped/mentioned document queries.
 
-## Design & Approach
+## Tech Stack
 
-### Chosen approach
-
-The backend is a FastAPI application with explicit service layers:
-
-- `ingestion/` handles file persistence, extraction, chunking, and indexing.
-- `embeddings/` handles embedding generation through a provider abstraction.
-- `vectorstore/` wraps Chroma persistence and retrieval.
-- `llm/` handles chat orchestration and streaming generation.
-- `ocr/` and `audio/` isolate Tesseract and faster-whisper usage.
-
-The frontend is a Next.js App Router application with a minimal dashboard shell:
-
-- `Onboarding` explains the local-first setup.
-- `Documents` handles upload and re-indexing.
-- `Chat` streams answers and shows citations.
-- `Settings` manages providers and advanced retrieval controls.
-
-### Why this approach
-
-- It keeps provider switching explicit instead of hiding it in route handlers.
-- It avoids hardcoding Ollama-only behavior while still keeping the local-first path simple.
-- It stores retrieval state separately from UI state, which matters because re-indexing is a backend data integrity concern, not just a frontend warning.
-
-### Alternative considered
-
-An alternative was to collapse everything into a few route files with direct Chroma and LiteLLM calls. That would be faster to write, but it would make provider switching, re-index enforcement, and future background processing harder to reason about. For an MVP expected to grow, that trade-off is not worth it.
-
-### Relevant fundamentals
-
-- Retrieval depends on embedding-space compatibility. Query vectors and stored vectors must come from the same embedding setup.
-- Chunking is a preprocessing concern, not an LLM concern. That is why chunk size and overlap live in settings and affect indexing only.
-- Streaming is implemented with Server-Sent Events from FastAPI because the frontend only needs one-way token delivery from the backend.
-- Chroma persistence is local disk state. Document metadata is stored separately in JSON so re-indexing can replay the original source files.
-
-## Folder Structure
-
-```text
-rag-app/
-  .env.example
-  README.md
-  Checklist.md
-  backend/
-    Dockerfile
-    requirements.txt
-    app/
-      api/
-        routes.py
-      core/
-        config.py
-        constants.py
-      providers/
-        llm_provider.py
-        embedding_provider.py
-      schemas/
-        chat.py
-        documents.py
-        settings.py
-      services/
-        audio/
-          transcription_service.py
-        embeddings/
-          service.py
-        ingestion/
-          chunking.py
-          extractors.py
-          pipeline.py
-        llm/
-          chat_service.py
-        ocr/
-          tesseract_service.py
-        vectorstore/
-          chroma_store.py
-        document_registry.py
-        settings_service.py
-      main.py
-    data/
-      uploads/
-      processed/
-  frontend/
-    Dockerfile
-    package.json
-    tailwind.config.ts
-    postcss.config.js
-    tsconfig.json
-    app/
-      api/[...path]/route.ts
-      chat/page.tsx
-      documents/page.tsx
-      onboarding/page.tsx
-      settings/page.tsx
-      globals.css
-      layout.tsx
-      page.tsx
-    components/
-      shell.tsx
-      sidebar.tsx
-      status-banner.tsx
-    lib/
-      api.ts
-      types.ts
-  docker/
-    docker-compose.yml
-```
-
-## Implementation (Incremental)
-
-### 1. Backend configuration and persistence
-
-The backend uses `EnvironmentSettings` for runtime paths and environment defaults, and `PersistedSettings` for user-configurable application behavior.
-
-Why it exists:
-
-- Environment values belong to deployment and container setup.
-- User settings belong to application state.
-- Mixing those two makes re-index logic fragile.
-
-Key files:
-
-- `backend/app/core/config.py`
-- `backend/app/schemas/settings.py`
-- `backend/app/services/settings_service.py`
-- `backend/app/services/document_registry.py`
-
-### 2. Provider abstraction
-
-The provider abstraction is intentionally narrow:
-
-- `llm_provider.py` only knows how to stream chat completions.
-- `embedding_provider.py` only knows how to produce embeddings.
-
-Why it exists:
-
-- LLM generation and embedding generation change at different times.
-- Anthropic may be valid for generation but not for embeddings in this MVP.
-- The rest of the code should not care whether the backend is using Ollama or a cloud provider.
-
-Key files:
-
-- `backend/app/providers/llm_provider.py`
-- `backend/app/providers/embedding_provider.py`
-
-### 3. Ingestion pipeline
-
-The ingestion pipeline does four things in sequence:
-
-1. Save the uploaded file locally.
-2. Extract text based on file type.
-3. Chunk the text using the current retrieval settings.
-4. Generate embeddings and upsert them into Chroma.
-
-Why it exists:
-
-- Extraction is file-type specific.
-- Chunking is retrieval specific.
-- Embedding is provider specific.
-- Upserting is vector-store specific.
-
-Keeping them separated avoids one large upload handler with mixed responsibilities.
-
-Key files:
-
-- `backend/app/services/ingestion/extractors.py`
-- `backend/app/services/ingestion/chunking.py`
-- `backend/app/services/ingestion/pipeline.py`
-- `backend/app/services/ocr/tesseract_service.py`
-- `backend/app/services/audio/transcription_service.py`
-
-### 4. Chat orchestration
-
-The chat flow is:
-
-1. Take the latest user message.
-2. Embed the question with the current embedding provider.
-3. Retrieve top-k chunks from Chroma.
-4. Build a grounded system prompt with numbered source blocks.
-5. Stream the answer back through SSE.
-6. Send a final event with structured source citations.
-
-Why it exists:
-
-- Retrieval and answer generation are separate steps with different failure modes.
-- The frontend needs streaming tokens and citations, not just a single blocking response.
-
-Key files:
-
-- `backend/app/services/vectorstore/chroma_store.py`
-- `backend/app/services/llm/chat_service.py`
-- `backend/app/api/routes.py`
-
-### 5. Frontend UX
-
-The frontend keeps the default mode non-technical:
-
-- Onboarding explains the flow in plain language.
-- Documents focuses on uploading and re-indexing.
-- Chat focuses on answers and visible citations.
-- Settings exposes only the LLM controls by default.
-
-Developer Mode reveals:
-
-- Embedding provider
-- Embedding model
-- Embedding version
-- Chunk size
-- Chunk overlap
-- Top-k retrieval
-- Optional base URL overrides
-
-Key files:
-
-- `frontend/app/onboarding/page.tsx`
-- `frontend/app/documents/page.tsx`
-- `frontend/app/chat/page.tsx`
-- `frontend/app/settings/page.tsx`
-- `frontend/lib/api.ts`
-
-## API Surface
-
-### `POST /upload`
-
-Accepts multipart files under `files`.
-
-Behavior:
-
-- Rejects uploads if re-indexing is required.
-- Saves each file locally.
-- Extracts text.
-- Chunks and embeds text.
-- Stores vectors in Chroma.
-- Stores document metadata in local JSON.
-
-### `POST /chat`
-
-Accepts:
-
-```json
-{
-  "messages": [
-    { "role": "user", "content": "What is in the document?" }
-  ]
-}
-```
-
-Response:
-
-- SSE stream of `token` events
-- final `sources` event
-- final `done` event
-
-### `GET /documents`
-
-Returns the indexed document registry.
-
-### `POST /reindex`
-
-Behavior:
-
-- Clears the Chroma collection
-- Replays all stored source files
-- Rebuilds vectors using the current embedding settings
-- Clears the `reindex_required` flag
-
-### `GET /settings`
-
-Returns the current local configuration plus:
-
-- supported providers
-- current embedding signature
-- indexed document count
-- re-index status
-
-### `POST /settings`
-
-Updates settings. If the embedding signature changes and documents already exist, the backend marks the index as stale and requires re-indexing.
-
-## Provider Switching Logic
-
-This is the most important integrity rule in the app.
-
-Every indexed document stores:
-
-- `embedding_provider`
-- `embedding_model`
-- `embedding_version`
-
-The global settings store also has a current embedding signature. When the signature changes:
-
-- the backend sets `reindex_required = true`
-- upload and chat routes return `409`
-- the frontend shows a warning banner and a re-index action
-
-This is necessary because vectors from different embedding models are not comparable in a meaningful way.
-
-## Docker Setup
-
-### Services
-
-- `backend`: FastAPI service with Chroma persistence, Tesseract, and faster-whisper support
-- `frontend`: Next.js App Router app
-- `ollama`: local model runtime for chat and embeddings
-
-### Start with Docker Compose
-
-From `rag-app/docker`:
-
-```bash
-cp ../.env.example ../.env
-docker compose up --build
-```
-
-Then open:
-
-- Frontend: [http://localhost:3000](http://localhost:3000)
-- Backend health: [http://localhost:8000/health](http://localhost:8000/health)
-- Ollama: [http://localhost:11434](http://localhost:11434)
-
-### Pull local models in Ollama
-
-After Ollama is up, pull at least:
-
-```bash
-docker exec -it rag-ollama ollama pull llama3.1:8b
-docker exec -it rag-ollama ollama pull nomic-embed-text
-```
-
-## Local Development Without Docker
-
-### Backend
-
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-System dependencies still required:
-
-- `tesseract`
-- `ffmpeg`
+![Next.js](https://img.shields.io/badge/Next.js-15.0.0-black?style=flat-square&logo=next.js)
+![React](https://img.shields.io/badge/React-19.0.0-149ECA?style=flat-square&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)
+![ChromaDB](https://img.shields.io/badge/ChromaDB-0.5+-7C3AED?style=flat-square)
+![SQLite](https://img.shields.io/badge/SQLite-local-003B57?style=flat-square&logo=sqlite&logoColor=white)
+![LiteLLM](https://img.shields.io/badge/LiteLLM-1.51+-6D28D9?style=flat-square)
+![Ollama](https://img.shields.io/badge/Ollama-local-111111?style=flat-square)
 
 ### Frontend
 
+- Next.js `^15.0.0`
+- React `^19.0.0`
+- TypeScript `^5.7.2`
+- Tailwind CSS `^3.4.17`
+- Framer Motion `^12.9.4`
+- Lucide React `^0.511.0`
+- React Markdown `^10.1.0`
+
+### Backend
+
+- FastAPI `>=0.115,<1.0`
+- Uvicorn `>=0.30,<1.0`
+- Pydantic `>=2.8,<3.0`
+- ChromaDB `>=0.5,<1.0`
+- LiteLLM `>=1.51,<2.0`
+- aiosqlite `>=0.20,<1.0`
+- pypdf `>=5.0,<6.0`
+- pytesseract `>=0.3,<1.0`
+- Pillow `>=10.4,<11.0`
+- faster-whisper `>=1.0,<2.0`
+- sentence-transformers `>=3.0,<4.0`
+- rank-bm25 `>=0.2,<1.0`
+
+## Architecture
+
+```mermaid
+flowchart LR
+    U["User"] --> F["Next.js frontend"]
+    F --> P["Next.js API proxy (/api/[...path])"]
+    P --> B["FastAPI backend"]
+    B --> X["Text extraction\nPDF / OCR / Whisper / text parsers"]
+    B --> E["Embedding service"]
+    B --> R["Retrieval service"]
+    B --> M["Memory service"]
+    E --> O["Ollama or LiteLLM embeddings"]
+    R --> C["ChromaDB persistent vectors"]
+    R --> BM["BM25 lexical index"]
+    R --> CE["Cross-encoder reranker"]
+    B --> S["SQLite + JSON + processed files"]
+    B --> L["LLM provider\nOllama or LiteLLM"]
+    L --> B
+    B --> F
+```
+
+### Storage layout
+
+- `backend/data/uploads/`: raw uploaded files
+- `backend/data/processed/`: extracted text and enrichment JSON
+- `backend/data/chroma/`: persistent ChromaDB vector store
+- `backend/data/conversations.db`: workspaces, conversations, messages, memories
+- `backend/data/chunks.db`: parent chunk storage for context expansion
+- `backend/data/graph.db`: document relationship edges
+- `backend/data/workspaces/<workspace_id>/settings.json`: workspace settings
+- `backend/data/workspaces/<workspace_id>/documents.json`: workspace document metadata
+
+## How the RAG Pipeline Actually Works
+
+### 1. Ingestion
+
+The upload endpoint is `POST /upload`. `IngestionPipeline.ingest_uploads()` saves each file under a checksum-based filename, creates a placeholder document record with `processing` status, and starts async indexing work.
+
+Special ingestion behavior:
+
+- `.eml`: parsed into text via `email_parser.py`
+- `.zip`: treated as Slack export archives and expanded via `slack_parser.py`
+- other supported files: extracted directly
+
+### 2. Text extraction
+
+`TextExtractionService` chooses extraction by extension:
+
+- PDF: `pypdf.PdfReader`
+- Markdown / text / parsed email text: UTF-8 file read
+- Images: Tesseract OCR via `pytesseract`
+- Audio: Faster Whisper transcription via `faster-whisper`
+
+Current supported extensions from `backend/app/core/constants.py`:
+
+- PDFs: `.pdf`
+- Text: `.md`, `.txt`, `.eml`
+- Images: `.png`, `.jpg`, `.jpeg`, `.tiff`, `.bmp`, `.webp`
+- Audio: `.mp3`, `.wav`, `.m4a`, `.flac`, `.ogg`
+- Archives: `.zip` (Slack export import path)
+
+### 3. Enrichment
+
+Before embedding, `EnrichmentService` generates document-level metadata such as:
+
+- summary
+- document type
+- topics
+
+It also contextualizes individual chunks by prepending a generated header, plus the filename, to improve downstream retrieval.
+
+### 4. Chunking
+
+`split_text_parent_child()` creates parent-child chunk groups:
+
+- parent chunks are larger context containers
+- child chunks are the embedded retrieval units
+- page and offset metadata are preserved where possible
+
+Parent chunks are also stored in `chunks.db` so retrieved children can later be expanded back into richer context.
+
+### 5. Embeddings and indexing
+
+`EmbeddingService` batches embedding calls. By default the configured models are:
+
+- chat model: `llama3.1:8b`
+- enrichment model: `llama3.2:3b`
+- embedding model: `nomic-embed-text`
+- Whisper model: `base`
+
+The default local provider path is Ollama, with `OLLAMA_KEEP_ALIVE=5m`.
+
+Embeddings are stored in ChromaDB through `ChromaVectorStore.upsert_document()`, alongside metadata such as filename, file type, topics, source type, page number, and parent chunk ID. A BM25 index is also maintained in parallel.
+
+### 6. Retrieval
+
+`RetrievalService.retrieve()` uses a multi-step pipeline:
+
+1. Embed the user query
+2. Build retrieval filters from chat scoping, tags, file type, and temporal hints
+3. Run semantic search in ChromaDB
+4. Run lexical search in BM25
+5. Fuse results using reciprocal rank fusion
+6. Re-rank with the cross-encoder when enabled
+7. Apply final reranking and minimum chunk coverage
+8. Expand with related documents
+9. Swap child chunks for stored parent chunks when available
+
+This is not a plain top-k vector lookup. It is a hybrid retrieval pipeline with reranking and parent-context expansion.
+
+### 7. Chat generation
+
+`ChatService.stream_response()` classifies the question, selects a response mode, retrieves sources, optionally injects persistent memory, and streams tokens back over Server-Sent Events.
+
+Extra response paths implemented in code:
+
+- comparison retrieval across documents
+- contradiction analysis
+- action-item-focused retrieval
+- draft mode prompt shaping
+- mention-aware source inclusion (`@document`)
+- tag-aware topic focus (`#tag`)
+- workspace-aware conversation persistence
+
+## Features Present in the Codebase
+
+### Core
+
+- Local file upload and indexing
+- Streamed chat answers over SSE
+- Persistent ChromaDB vector storage
+- SQLite-backed conversations and message history
+- Workspace support
+- Re-indexing when embedding settings change
+- Storage usage and disk usage reporting
+
+### AI / Retrieval
+
+- Ollama-first local inference
+- LiteLLM provider abstraction for non-Ollama chat and embeddings
+- Hybrid retrieval: semantic + BM25
+- Cross-encoder reranking
+- Comparison-mode retrieval across many documents
+- Contradiction analysis mode
+- Response modes: `answer`, `summary`, `extract`, `action_items`, `timeline`, `draft`, `gaps`
+- Temporal query hints (`recent`, `last week`, `last month`, `quarter`, etc.)
+- Related-document expansion
+
+### Ingestion / Knowledge Processing
+
+- PDF extraction
+- OCR for images
+- Audio transcription with Faster Whisper
+- Email import from `.eml`
+- Slack export import from `.zip`
+- Per-document summaries, topics, and type enrichment
+- Tagging and document relationships
+
+### Memory
+
+- Persistent memory facts across sessions
+- Conversation summaries
+- User preference memory
+- Memory listing and deactivation APIs
+
+### Frontend
+
+- Next.js App Router frontend
+- Chat UI with conversation history
+- Rich composer with command palette and `@` / `#` mention chips
+- Document library and upload flow
+- Settings and onboarding screens
+- Source pages for external connector scaffolds
+
+## API Surface
+
+### Health
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | Liveness check |
+
+### Workspaces
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/workspaces` | List workspaces |
+| `POST` | `/workspaces` | Create workspace |
+| `POST` | `/workspaces/{workspace_id}/select` | Set active workspace |
+
+### Documents and ingestion
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/upload` | Upload and start indexing files |
+| `GET` | `/documents` | List documents |
+| `GET` | `/documents/{document_id}` | Fetch document detail and extracted text |
+| `GET` | `/documents/{document_id}/file` | Download original file |
+| `PATCH` | `/documents/{document_id}/status` | Update document status |
+| `DELETE` | `/documents/{document_id}` | Delete document and vectors |
+| `POST` | `/reindex` | Re-index all documents |
+| `GET` | `/documents/tags` | List all tags |
+| `PATCH` | `/documents/{document_id}/tags` | Update tags |
+
+### Document graph
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/documents/{document_id}/relationships` | Add document relationship |
+| `GET` | `/documents/{document_id}/relationships` | List relationships |
+| `DELETE` | `/documents/relationships/{edge_id}` | Delete relationship |
+
+### Chat and conversations
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/chat` | Stream chat answer |
+| `GET` | `/conversations` | List conversations |
+| `POST` | `/conversations` | Create conversation |
+| `GET` | `/conversations/{conversation_id}` | Get conversation summary |
+| `GET` | `/conversations/{conversation_id}/messages` | Get message history |
+| `POST` | `/conversations/{conversation_id}/messages` | Append message manually |
+| `PATCH` | `/conversations/{conversation_id}` | Rename conversation |
+| `POST` | `/conversations/{conversation_id}/pin` | Toggle pin |
+| `DELETE` | `/conversations/{conversation_id}` | Delete conversation |
+| `GET` | `/conversations/{conversation_id}/search` | Search within conversation |
+| `POST` | `/messages/{message_id}/rate` | Rate assistant message |
+
+### Settings and status
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/settings` | Read persisted settings |
+| `POST` | `/settings` | Update settings |
+| `GET` | `/ollama/status` | Check Ollama connectivity |
+| `GET` | `/storage/usage` | Report app storage usage |
+| `GET` | `/storage/disk` | Report disk usage |
+
+### Memory
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/memories` | List memory facts |
+| `DELETE` | `/memories/{memory_id}` | Deactivate memory fact |
+| `GET` | `/memory/summaries` | List conversation summaries |
+| `GET` | `/memory/preferences` | List stored preferences |
+
+### Source connectors
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/sources` | List source connectors |
+| `POST` | `/sources/{source_type}/connect` | Start connector auth flow |
+| `GET` | `/sources/{source_type}/callback` | OAuth callback scaffold |
+| `POST` | `/sources/{source_type}/sync` | Trigger sync scaffold |
+| `GET` | `/sources/{source_type}/status` | Connector status scaffold |
+| `DELETE` | `/sources/{source_type}/disconnect` | Disconnect scaffold |
+| `GET` | `/sources/{source_type}/items` | List indexed items scaffold |
+
+`/sources` is currently scaffold-level. The routes return mock/manual connector data rather than full live integrations.
+
+## Frontend / Backend Interaction
+
+The frontend does not call the backend directly from the browser in every case. `frontend/app/api/[...path]/route.ts` proxies requests to the backend service, including SSE chat responses. In Docker, the proxy target defaults to `http://backend:8000`.
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.11
+- Node.js 20+
+- `pnpm`
+- Ollama installed and running
+- System packages for local backend runs:
+  - `ffmpeg`
+  - `tesseract-ocr`
+  - image runtime libs required by Pillow
+
+### Option A: Run with Docker Compose
+
+```bash
+cd docker
+docker compose up --build
+```
+
+Services started by `docker/docker-compose.yml`:
+
+- backend on `http://localhost:8000`
+- frontend on `http://localhost:3000`
+
+### Option B: Run locally without Docker
+
+Backend:
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Frontend:
+
 ```bash
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm dev --hostname 0.0.0.0 --port 3000
 ```
 
-## Example Environment File
+### Ollama models
 
-```env
-APP_ENV=development
-BACKEND_HOST=0.0.0.0
-BACKEND_PORT=8000
-CORS_ORIGINS=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
-OLLAMA_BASE_URL=http://ollama:11434
-DEFAULT_WHISPER_MODEL=small
+Pull the default local models used by the code:
+
+```bash
+ollama pull llama3.1:8b
+ollama pull llama3.2:3b
+ollama pull nomic-embed-text
 ```
 
-Why `NEXT_PUBLIC_API_URL` points to `/api`:
+If you plan to transcribe audio locally, the backend will use Faster Whisper with `DEFAULT_WHISPER_MODEL=base` unless you change it.
 
-- In Docker, the frontend cannot call `localhost:8000` from the browser container directly in a portable way.
-- The Next.js catch-all route proxies browser requests to the backend service.
+## Environment Variables
 
-If you run the frontend outside Docker, point `NEXT_PUBLIC_API_URL` directly at `http://localhost:8000`.
+These are defined in `.env.example` or inferred directly from `EnvironmentSettings`:
 
-## Edge Cases & Failure Modes
+| Variable | Default | Purpose |
+|---|---|---|
+| `APP_ENV` | `development` | Runtime mode |
+| `BACKEND_HOST` | `0.0.0.0` | Backend bind host |
+| `BACKEND_PORT` | `8000` | Backend port |
+| `CORS_ORIGINS` | empty in `.env.example`, code default `http://localhost:3000` | Allowed frontend origins |
+| `NEXT_PUBLIC_API_URL` | empty | Frontend API base override |
+| `OLLAMA_BASE_URL` | empty in `.env.example`, code default `http://host.docker.internal:11434` | Ollama server URL |
+| `OLLAMA_KEEP_ALIVE` | `5m` | Keep Ollama models loaded for 5 minutes |
+| `OLLAMA_LLM` | `llama3.1:8b` | Intended default chat model |
+| `OLLAMA_EMBED` | `nomic-embed-text` | Intended default embedding model |
+| `DEFAULT_WHISPER_MODEL` | `base` | Faster Whisper model |
+| `DATA_PATH` | `/data` in `.env.example` | Data root hint |
 
-### Unsupported file types
+Notes:
 
-The backend rejects unsupported extensions before processing.
+- The runtime settings UI can override several model choices and providers after startup.
+- The Python config class uses `data_root`, while `.env.example` exposes `DATA_PATH`; this deserves cleanup if you want one canonical variable.
 
-### Empty extraction
+## Technical Highlights
 
-If OCR, PDF parsing, or transcription yields no usable text, the backend raises a validation error instead of creating an empty index entry.
+- Hybrid retrieval instead of plain vector search: semantic Chroma retrieval, BM25 lexical retrieval, reciprocal rank fusion, then cross-encoder reranking.
+- Parent-child chunking with later parent expansion to improve answer context density.
+- Comparison-mode retrieval that deliberately represents many documents instead of letting top-k similarity cluster around only one or two.
+- Persistent memory stored alongside conversation history, with fact extraction and conversation summarization running as best-effort background tasks.
+- Local-first model strategy with Ollama, but provider abstraction through LiteLLM for OpenAI/Anthropic-compatible paths.
+- Workspace-aware persistence without requiring a separate external database server.
 
-### Embedding mismatch
+## Known Gaps / TODOs
 
-This is intentionally blocked. Once the embedding setup changes, the app requires a full re-index before more retrieval calls can happen.
+- The `/sources` integrations are scaffolds, not complete connector implementations.
+- The repo contains onboarding and UI system work in progress; the frontend is feature-rich but still evolving structurally.
+- There is no documented authentication layer in the current backend routes.
+- Production deployment guidance is still a TODO beyond the local Docker/dev setup.
+- The env/config naming around `DATA_PATH` vs `data_root` should be normalized.
 
-### Missing API keys
+## Repository Structure
 
-If the selected provider requires an API key and none is configured, the provider abstraction raises a clear error.
+```text
+backend/
+  app/
+    api/              FastAPI routes
+    core/             config and constants
+    providers/        LLM and embedding provider adapters
+    schemas/          Pydantic request/response models
+    services/         ingestion, retrieval, chat, memory, storage, graph
+frontend/
+  app/                Next.js App Router pages and API proxy
+  components/         chat, documents, onboarding, shared UI
+  lib/                API client, shared types, frontend helpers
+docker/
+  docker-compose.yml  local multi-service dev stack
+docs/
+  project notes and architectural walkthroughs
+```
 
-### Scanned PDFs
+## Contact
 
-This MVP does not OCR scanned PDFs. The ingestion path only OCRs standalone image files. If scanned PDFs matter, add a PDF-to-image OCR fallback next.
-
-### Long transcription and large uploads
-
-Everything runs inline in the request path in this MVP. That is acceptable for a first version, but larger installations should move ingestion and re-indexing into background jobs.
-
-## Summary
-
-This scaffold gives you a local-first RAG MVP with:
-
-- FastAPI backend
-- Next.js frontend
-- Chroma local persistence
-- LiteLLM provider abstraction
-- Ollama local generation and embeddings
-- OCR and audio transcription
-- SSE chat streaming with citations
-- explicit embedding versioning and forced re-indexing
-
-It stays minimal on purpose, but the boundaries are already set up so you can add authentication, jobs, better document lifecycle management, and more providers without rewriting the core flow.
-
-## Optional Suggestion
-
-If you plan to ingest large audio files or many PDFs, add a background job queue next. The concrete benefit is that uploads and re-indexing stop blocking HTTP requests, which makes the UI more reliable under heavier local workloads.
-
-## Self-Audit
-
-- The provider-switching rule is implemented consistently in the backend and reflected in the frontend.
-- The chat flow only works against the current embedding signature.
-- The code stays modular and avoids hardcoding a single provider path.
-- The main uncertainty is operational rather than structural: exact model availability depends on what the local Ollama instance has already pulled.
-
-After you review this scaffold, explain back why the app blocks chat after an embedding change instead of silently continuing. That will tell me whether the retrieval integrity model is clear.
+- Website: `TODO`
+- Documentation hub: `TODO`
+- Issue tracker: `TODO`
+- Maintainer: `TODO`

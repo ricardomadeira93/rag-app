@@ -1,10 +1,11 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, FileSearch, FileText, LayoutGrid } from "lucide-react";
+import { AlertTriangle, Copy, FileSearch, FileText, LayoutGrid, Link2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import Link from "next/link";
 
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { Button } from "@/components/ui/button";
@@ -61,74 +62,124 @@ export function DocumentContent({ detail }: DocumentContentProps) {
       transition={springTransition}
       className="pb-24 pt-8"
     >
-      <div className="mb-6 flex items-center gap-6 border-b border-zinc-200">
-        <button
-          onClick={() => setActiveTab("native")}
-          className={`flex items-center gap-2 border-b-2 pb-3 text-[13px] font-medium transition-colors ${
-            activeTab === "native"
-              ? "border-[var(--text-primary)] text-[var(--text-primary)]"
-              : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-          }`}
-        >
-          <FileText className="h-4 w-4" />
-          Original File
-        </button>
-        <button
-          onClick={() => setActiveTab("extraction")}
-          className={`flex items-center gap-2 border-b-2 pb-3 text-[13px] font-medium transition-colors ${
-            activeTab === "extraction"
-              ? "border-[var(--text-primary)] text-[var(--text-primary)]"
-              : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-          }`}
-        >
-          <LayoutGrid className="h-4 w-4" />
-          RAG Extraction
-        </button>
-      </div>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div>
+          <div className="mb-6 flex items-center gap-6 border-b border-zinc-200">
+            <button
+              onClick={() => setActiveTab("native")}
+              className={`flex items-center gap-2 border-b-2 pb-3 text-[13px] font-medium transition-colors ${
+                activeTab === "native"
+                  ? "border-[var(--text-primary)] text-[var(--text-primary)]"
+                  : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Original File
+            </button>
+            <button
+              onClick={() => setActiveTab("extraction")}
+              className={`flex items-center gap-2 border-b-2 pb-3 text-[13px] font-medium transition-colors ${
+                activeTab === "extraction"
+                  ? "border-[var(--text-primary)] text-[var(--text-primary)]"
+                  : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              RAG Extraction
+            </button>
+          </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.15 }}
-          className="min-h-[500px]"
-        >
-          {activeTab === "native" && (
-            <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-sm overflow-hidden min-h-[400px]">
-              {type === "pdf" ? (
-                <iframe src={`${fileUrl}#view=FitH`} className="w-full h-[85vh] border-none" title={detail.item.filename} />
-              ) : type === "image" ? (
-                <div className="p-4 bg-[var(--bg-subtle)] flex items-center justify-center min-h-[400px]">
-                  <img src={fileUrl} alt={detail.item.filename} className="max-w-full rounded-xl object-contain" />
-                </div>
-              ) : type === "audio" ? (
-                <div className="p-8 bg-[var(--bg-subtle)] flex items-center justify-center min-h-[400px]">
-                  <div className="w-full max-w-md">
-                    <p className="text-center text-sm font-medium text-[var(--text-primary)] mb-6">{detail.item.filename}</p>
-                    <AudioPlayer src={fileUrl} title={detail.item.filename} />
-                  </div>
-                </div>
-              ) : (
-                <div className="p-8 lg:p-12">
-                  <div className="prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none text-[var(--text-secondary)]">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {content}
-                    </ReactMarkdown>
-                  </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="min-h-[500px]"
+            >
+              {activeTab === "native" && (
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-sm overflow-hidden min-h-[400px]">
+                  {type === "pdf" ? (
+                    <iframe src={`${fileUrl}#view=FitH`} className="w-full h-[85vh] border-none" title={detail.item.filename} />
+                  ) : type === "image" ? (
+                    <div className="p-4 bg-[var(--bg-subtle)] flex items-center justify-center min-h-[400px]">
+                      <img src={fileUrl} alt={detail.item.filename} className="max-w-full rounded-xl object-contain" />
+                    </div>
+                  ) : type === "audio" ? (
+                    <div className="p-8 bg-[var(--bg-subtle)] flex items-center justify-center min-h-[400px]">
+                      <div className="w-full max-w-md">
+                        <p className="text-center text-sm font-medium text-[var(--text-primary)] mb-6">{detail.item.filename}</p>
+                        <AudioPlayer src={fileUrl} title={detail.item.filename} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 lg:p-12">
+                      <div className="prose prose-zinc dark:prose-invert prose-sm sm:prose-base max-w-none text-[var(--text-secondary)]">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {activeTab === "extraction" && (
-            <div className="document-prose max-w-none">
-              {ExtractedBlocksView(blocks)}
+              {activeTab === "extraction" && (
+                <div className="document-prose max-w-none">
+                  {ExtractedBlocksView(blocks)}
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <aside className="space-y-4">
+          {detail.item.conflicting_docs.length > 0 ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-700" />
+                <div>
+                  <p className="text-[12px] font-semibold text-amber-900">Potential contradictions</p>
+                  <div className="mt-2 space-y-2">
+                    {detail.item.conflicting_docs.map((conflict) => (
+                      <Link
+                        key={`${conflict.doc_id}-${conflict.reason}`}
+                        href={`/chat?documents=${detail.item.id},${conflict.doc_id}&prompt=${encodeURIComponent(`Find conflicts between ${detail.item.filename} and ${conflict.filename}`)}`}
+                        className="block rounded-lg bg-white/80 px-3 py-2 text-[12px] text-amber-900"
+                      >
+                        <div className="font-medium">{conflict.filename}</div>
+                        {conflict.reason ? <div className="mt-1 text-amber-800">{conflict.reason}</div> : null}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
+          ) : null}
+
+          {detail.item.related_docs.length > 0 ? (
+            <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-[var(--text-muted)]" />
+                <p className="text-[12px] font-semibold text-[var(--text-primary)]">Documents related to this one</p>
+              </div>
+              <div className="mt-3 space-y-2">
+                {detail.item.related_docs.map((related) => (
+                  <Link
+                    key={related.doc_id}
+                    href={`/documents/${related.doc_id}`}
+                    className="flex items-center justify-between rounded-lg border border-[var(--border-soft)] px-3 py-2 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]"
+                  >
+                    <span className="truncate">{related.filename}</span>
+                    <span>{Math.round((related.similarity ?? 0) * 100)}%</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </aside>
+      </div>
     </motion.div>
   );
 }
