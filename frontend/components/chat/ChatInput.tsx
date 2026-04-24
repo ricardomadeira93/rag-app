@@ -32,6 +32,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import Link from "next/link";
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { AttachmentChips } from "@/components/chat/AttachmentChips";
@@ -633,7 +634,9 @@ export function ChatInput({
                 ) : (
                   <div className="px-3 py-2 text-[12px] text-[var(--text-muted)]">
                     <div>No documents match &quot;@{trigger.query}&quot;</div>
-                    <a href="/documents/upload" className="mt-1 inline-flex text-[var(--accent)]">Upload a file to mention it →</a>
+                    <Link href="/documents/upload" className="mt-1 inline-flex text-[var(--accent)]">
+                      Upload a file to mention it →
+                    </Link>
                   </div>
                 )}
               </div>

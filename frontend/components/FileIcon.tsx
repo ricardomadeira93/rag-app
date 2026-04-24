@@ -1,6 +1,6 @@
 "use client";
 
-import { File, FileAudio, FileCode, FileText, Image } from "lucide-react";
+import { File, FileAudio, FileCode, FileText, Image as ImageIcon } from "lucide-react";
 
 type FileIconProps = {
   type?: string | null;
@@ -14,9 +14,9 @@ const EXTENSION_MAP: Record<string, { icon: typeof File; color: string }> = {
   ".mp3":  { icon: FileAudio, color: "text-[#3b82f6]" },   // blue
   ".wav":  { icon: FileAudio, color: "text-[#3b82f6]" },
   ".m4a":  { icon: FileAudio, color: "text-[#3b82f6]" },
-  ".png":  { icon: Image, color: "text-[#f59e0b]" },       // amber
-  ".jpg":  { icon: Image, color: "text-[#f59e0b]" },
-  ".jpeg": { icon: Image, color: "text-[#f59e0b]" },
+  ".png":  { icon: ImageIcon, color: "text-[#f59e0b]" },       // amber
+  ".jpg":  { icon: ImageIcon, color: "text-[#f59e0b]" },
+  ".jpeg": { icon: ImageIcon, color: "text-[#f59e0b]" },
   ".txt":  { icon: FileText, color: "text-[#6b7280]" },    // gray
 };
 
@@ -41,7 +41,7 @@ export function FileIcon({ type, filename, className = "" }: FileIconProps) {
     return <FileAudio className={`shrink-0 text-[#3b82f6] ${className}`} />;
   }
   if (normalized === "image") {
-    return <Image className={`shrink-0 text-[#f59e0b] ${className}`} />;
+    return <ImageIcon className={`shrink-0 text-[#f59e0b] ${className}`} />;
   }
   if (normalized === "pdf") {
     return <FileText className={`shrink-0 text-[#ef4444] ${className}`} />;

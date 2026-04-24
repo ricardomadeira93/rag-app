@@ -5,6 +5,7 @@ import { AlertTriangle, Copy, FileSearch, FileText, LayoutGrid, Link2 } from "lu
 import { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import Image from "next/image";
 import Link from "next/link";
 
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -104,7 +105,14 @@ export function DocumentContent({ detail }: DocumentContentProps) {
                     <iframe src={`${fileUrl}#view=FitH`} className="w-full h-[85vh] border-none" title={detail.item.filename} />
                   ) : type === "image" ? (
                     <div className="p-4 bg-[var(--bg-subtle)] flex items-center justify-center min-h-[400px]">
-                      <img src={fileUrl} alt={detail.item.filename} className="max-w-full rounded-xl object-contain" />
+                      <Image
+                        src={fileUrl}
+                        alt={detail.item.filename}
+                        width={1600}
+                        height={1200}
+                        unoptimized
+                        className="max-w-full rounded-xl object-contain"
+                      />
                     </div>
                   ) : type === "audio" ? (
                     <div className="p-8 bg-[var(--bg-subtle)] flex items-center justify-center min-h-[400px]">

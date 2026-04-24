@@ -462,7 +462,7 @@ function ActionItemsView({ content, allDocuments }: { content: string; allDocume
 
   useEffect(() => {
     setCheckedItems(items.map(() => false));
-  }, [content, items.length]);
+  }, [items]);
 
   async function handleCopyUnchecked() {
     const unchecked = items.filter((_, index) => !checkedItems[index]).map((item) => `- ${item}`);
