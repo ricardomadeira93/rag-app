@@ -168,9 +168,36 @@ class EnrichmentService:
 
         try:
             parsed = json.loads(candidate[start : end + 1])
-            return DocumentEnrichment.model_validate(parsed)
+            return DocumentEnrichment.model_validate(self._normalize_payload(parsed))
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON produced by model: {e}")
+
+    def _normalize_payload(self, parsed: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(parsed)
+
+        if normalized.get("summary") is None:
+            normalized["summary"] = ""
+        if normalized.get("topics") is None:
+            normalized["topics"] = []
+        if normalized.get("important_dates") is None:
+            normalized["important_dates"] = []
+        if normalized.get("key_points") is None:
+            normalized["key_points"] = []
+        if normalized.get("language") is None:
+            normalized["language"] = "unknown"
+        if normalized.get("confidence") is None:
+            normalized["confidence"] = 0.0
+
+        entities = normalized.get("entities")
+        if not isinstance(entities, dict):
+            entities = {}
+        normalized["entities"] = {
+            "people": entities.get("people") or [],
+            "organizations": entities.get("organizations") or [],
+            "locations": entities.get("locations") or [],
+        }
+
+        return normalized
 
     def _fallback(self, text: str) -> DocumentEnrichment:
         summary = self._fallback_summary(text)

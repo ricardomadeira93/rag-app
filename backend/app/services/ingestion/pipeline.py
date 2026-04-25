@@ -261,7 +261,7 @@ class IngestionPipeline:
         async with get_chunking_db(self.chunking_db_path) as db:
             for p in parent_chunk_map:
                 await db.execute(
-                    "INSERT INTO parent_chunks (id, document_id, content) VALUES (?, ?, ?)",
+                    "INSERT OR REPLACE INTO parent_chunks (id, document_id, content) VALUES (?, ?, ?)",
                     (p["id"], p["document_id"], p["content"])
                 )
             await db.commit()

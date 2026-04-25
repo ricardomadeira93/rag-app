@@ -5,9 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageList } from "@/components/chat/MessageList";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { StatusBanner } from "@/components/status-banner";
 import {
   createConversation,
+  deleteConversation,
   fetchConversation,
   fetchDocuments,
   fetchMemories,
@@ -31,7 +33,7 @@ import type {
   SourceRecord,
   SourceCitation,
 } from "@/lib/types";
-import { Brain, Search, Pin, PinOff, X } from "lucide-react";
+import { Brain, Search, Pin, PinOff, Trash2, X } from "lucide-react";
 
 export function ChatShell({ conversationId }: { conversationId?: string }) {
   const router = useRouter();
@@ -52,6 +54,8 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
   const [selectedMode, setSelectedMode] = useState<ResponseMode | null>(null);
   const [scopePickerSignal, setScopePickerSignal] = useState(0);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingConversation, setDeletingConversation] = useState(false);
   const [memoryPanelOpen, setMemoryPanelOpen] = useState(false);
   const [memories, setMemories] = useState<Array<{ id: string; fact: string }>>([]);
 
@@ -294,6 +298,26 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     }
   }
 
+  async function handleDeleteConversation() {
+    if (!activeConversationId) {
+      return;
+    }
+
+    setDeletingConversation(true);
+    try {
+      await deleteConversation(activeConversationId);
+      setMessages([]);
+      setActiveConversationId(null);
+      setConversationMeta(null);
+      setDeleteConfirmOpen(false);
+      router.push("/chat");
+    } catch {
+      setError("Failed to delete chat");
+    } finally {
+      setDeletingConversation(false);
+    }
+  }
+
   const displayedMessages = useMemo(() => {
     if (!searchQuery) return messages;
     const lowerQuery = searchQuery.toLowerCase();
@@ -452,6 +476,14 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
                     >
                       {conversationMeta.pinned ? <Pin className="h-4 w-4 fill-current" /> : <PinOff className="h-4 w-4" />}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmOpen(true)}
+                      className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-red-50 hover:text-red-600"
+                      title="Delete chat"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </>
               )}
@@ -565,6 +597,21 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
         onModeChange={setSelectedMode}
         onExecuteCommand={(commandId) => void handleCommand(commandId)}
         attachmentPickerSignal={scopePickerSignal}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete chat?"
+        description={
+          conversationMeta
+            ? `Permanently delete "${conversationMeta.title}"?`
+            : "Permanently delete this chat?"
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deletingConversation}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => void handleDeleteConversation()}
       />
     </div>
   );

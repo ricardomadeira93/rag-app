@@ -193,6 +193,12 @@ async def get_documents(request: Request) -> DocumentListResponse:
     return DocumentListResponse(items=documents, total=len(documents))
 
 
+@router.get("/documents/tags")
+async def list_document_tags(request: Request) -> list[str]:
+    container = get_container(request)
+    return container.documents.list_all_tags()
+
+
 @router.get("/documents/{document_id}", response_model=DocumentDetailResponse)
 async def get_document_detail(request: Request, document_id: str) -> DocumentDetailResponse:
     container = get_container(request)
@@ -273,12 +279,6 @@ async def delete_document_relationship(request: Request, edge_id: str) -> dict:
     if not success:
         raise HTTPException(status_code=404, detail="Edge not found")
     return {"id": edge_id, "deleted": True}
-
-
-@router.get("/documents/tags")
-async def list_document_tags(request: Request) -> list[str]:
-    container = get_container(request)
-    return container.documents.list_all_tags()
 
 
 @router.patch("/documents/{document_id}/tags", response_model=DocumentRecord)
