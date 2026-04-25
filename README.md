@@ -6,6 +6,7 @@
 <img width="1920" height="1440" alt="341shots_so" src="https://github.com/user-attachments/assets/e36fb38f-da11-4e85-91ca-bee47b063cf2" />
 <img width="1920" height="1440" alt="32shots_so" src="https://github.com/user-attachments/assets/773b3759-d2fe-4ac5-ab97-f65ff4d26fd1" />
 <img width="1920" height="1440" alt="932shots_so" src="https://github.com/user-attachments/assets/05a1f383-8f9e-45c5-bad0-c76be9f3af73" />
+
 `STARK` is a full-stack local knowledge assistant built around FastAPI, Next.js, ChromaDB, SQLite, and LiteLLM/Ollama. You upload files, the backend extracts and enriches their text, chunks and embeds the content, stores vectors locally, and then serves streamed chat answers grounded in retrieved context. The app is aimed at teams or individual operators who want a private, self-hosted document assistant instead of sending their data to a hosted SaaS.
 
 ## What It Does
