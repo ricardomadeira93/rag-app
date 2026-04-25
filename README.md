@@ -2,6 +2,7 @@
 # STARK
 
 > Local-first RAG workspace for chatting with documents, extracting decisions, and drafting grounded answers on your own machine.
+> 
 > <img width="1920" height="1440" alt="217shots_so" src="https://github.com/user-attachments/assets/6d44db29-b5e1-407b-8950-751652381ffa" />
 <img width="1920" height="1440" alt="341shots_so" src="https://github.com/user-attachments/assets/e36fb38f-da11-4e85-91ca-bee47b063cf2" />
 <img width="1920" height="1440" alt="32shots_so" src="https://github.com/user-attachments/assets/773b3759-d2fe-4ac5-ab97-f65ff4d26fd1" />
