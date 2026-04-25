@@ -2,11 +2,16 @@
 # STARK
 
 > Local-first RAG workspace for chatting with documents, extracting decisions, and drafting grounded answers on your own machine.
-> 
-> <img width="1920" height="1440" alt="217shots_so" src="https://github.com/user-attachments/assets/6d44db29-b5e1-407b-8950-751652381ffa" />
-<img width="1920" height="1440" alt="341shots_so" src="https://github.com/user-attachments/assets/e36fb38f-da11-4e85-91ca-bee47b063cf2" />
-<img width="1920" height="1440" alt="32shots_so" src="https://github.com/user-attachments/assets/773b3759-d2fe-4ac5-ab97-f65ff4d26fd1" />
-<img width="1920" height="1440" alt="932shots_so" src="https://github.com/user-attachments/assets/05a1f383-8f9e-45c5-bad0-c76be9f3af73" />
+
+<div align="center">
+
+<img width="49%" alt="STARK Dashboard" src="https://github.com/user-attachments/assets/6d44db29-b5e1-407b-8950-751652381ffa" />
+<img width="49%" alt="Multi-format file upload and processing" src="https://github.com/user-attachments/assets/e36fb38f-da11-4e85-91ca-bee47b063cf2" />
+
+<img width="49%" alt="Chat answering from uploaded documents" src="https://github.com/user-attachments/assets/773b3759-d2fe-4ac5-ab97-f65ff4d26fd1" />
+<img width="49%" alt="Workspace setup and onboarding" src="https://github.com/user-attachments/assets/05a1f383-8f9e-45c5-bad0-c76be9f3af73" />
+
+</div>
 
 `STARK` is a full-stack local knowledge assistant built around FastAPI, Next.js, ChromaDB, SQLite, and LiteLLM/Ollama. You upload files, the backend extracts and enriches their text, chunks and embeds the content, stores vectors locally, and then serves streamed chat answers grounded in retrieved context. The app is aimed at teams or individual operators who want a private, self-hosted document assistant instead of sending their data to a hosted SaaS.
 
