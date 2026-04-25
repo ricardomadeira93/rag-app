@@ -340,6 +340,7 @@ Services started by `docker/docker-compose.yml`:
 
 - backend on `http://localhost:8000`
 - frontend on `http://localhost:3000`
+- Compose project name is fixed to `stark`, so container and network names stay stable across machines
 
 ### Option B: Run locally without Docker
 

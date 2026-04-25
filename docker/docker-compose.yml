@@ -1,3 +1,5 @@
+name: stark
+
 services:
   backend:
     build:
