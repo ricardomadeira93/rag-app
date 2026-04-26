@@ -558,8 +558,8 @@ export default function LandingPage() {
                 >
                   {step.body}
                 </p>
-                <Link
-                  href={step.href as string & {}}
+                <a
+                  href={step.href}
                   style={{
                     fontSize: 12,
                     fontWeight: 500,
@@ -572,7 +572,7 @@ export default function LandingPage() {
                   onMouseOut={(e) => (e.currentTarget.style.color = "#7c7cf0")}
                 >
                   {step.cta}
-                </Link>
+                </a>
               </div>
             ))}
           </div>
