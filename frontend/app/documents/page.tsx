@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, Search, Upload } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -27,7 +28,7 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] } },
 } as const;
 
-export default function DocumentsPage() {
+function DocumentsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -287,5 +288,13 @@ export default function DocumentsPage() {
         </div>
       </motion.section>
     </motion.div>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense>
+      <DocumentsPageInner />
+    </Suspense>
   );
 }

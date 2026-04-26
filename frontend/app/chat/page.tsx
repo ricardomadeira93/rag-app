@@ -1,5 +1,12 @@
+import { Suspense } from "react";
+
 import { ChatShell } from "@/components/chat/ChatShell";
 
 export default function ChatPage() {
-  return <ChatShell />;
+  return (
+    <Suspense>
+      <ChatShell />
+    </Suspense>
+  );
 }
+
