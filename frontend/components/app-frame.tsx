@@ -74,7 +74,14 @@ export function AppFrame({ children }: { children: ReactNode }) {
   }, [onboarded, pathname, refreshing, resolved, router]);
 
   if (!resolved) {
-    return <div className="min-h-screen bg-canvas" />;
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-canvas">
+        <div className="flex items-center gap-3 text-muted">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <p className="text-sm font-medium">Connecting to server...</p>
+        </div>
+      </div>
+    );
   }
 
   if (pathname === "/onboarding" || pathname === "/") {

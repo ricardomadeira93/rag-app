@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -52,7 +53,36 @@ class OllamaEmbeddingProvider:
         return embeddings
 
 
+@dataclass
+class PineconeEmbeddingProvider:
+    api_key: str
+    model: str = "multilingual-e5-large"
+
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        # pinecone inference API is synchronous in the python client, so we run it in a thread
+        # or simply call it
+        import asyncio
+        from pinecone import Pinecone
+        
+        pc = Pinecone(api_key=self.api_key)
+        
+        def _get_embeddings():
+            return pc.inference.embed(
+                model=self.model,
+                inputs=texts,
+                parameters={"input_type": "passage", "truncate": "END"}
+            )
+            
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, _get_embeddings)
+        
+        return [item["values"] for item in response.data]
+
+
 def build_embedding_provider(settings: PersistedSettings, env: EnvironmentSettings) -> EmbeddingProvider:
+    pinecone_api_key = os.getenv("PINECONE_API_KEY")
+    if pinecone_api_key:
+        return PineconeEmbeddingProvider(api_key=pinecone_api_key)
     base_url = settings.embedding_base_url
     if settings.embedding_provider == "ollama" and not base_url:
         base_url = env.ollama_base_url

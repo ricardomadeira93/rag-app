@@ -17,7 +17,7 @@ from app.services.embeddings.service import EmbeddingService
 from app.services.enrichment_service import EnrichmentService
 from app.services.ingestion.chunking import ChunkWithMeta, split_text_parent_child
 from app.services.ingestion.extractors import TextExtractionService
-from app.services.vectorstore.chroma_store import ChromaVectorStore
+from app.services.vectorstore.base import VectorStore
 from app.services.vectorstore.bm25_store import BM25Store
 
 class IngestionPipeline:
@@ -28,7 +28,7 @@ class IngestionPipeline:
         extractor: TextExtractionService,
         embeddings: EmbeddingService,
         enrichment_service: EnrichmentService,
-        vector_store: ChromaVectorStore,
+        vector_store: VectorStore,
         bm25_store: BM25Store,
     ) -> None:
         self.env = env

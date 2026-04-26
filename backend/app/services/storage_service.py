@@ -8,7 +8,7 @@ from pathlib import Path
 from app.core.config import EnvironmentSettings
 from app.schemas.storage import DiskUsageResponse, StorageDocumentItem, StorageUsageResponse
 from app.services.document_service import DocumentService
-from app.services.vectorstore.chroma_store import ChromaVectorStore
+from app.services.vectorstore.base import VectorStore
 
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class StorageService:
         self,
         env: EnvironmentSettings,
         document_service: DocumentService,
-        vector_store: ChromaVectorStore,
+        vector_store: VectorStore,
     ) -> None:
         self.env = env
         self.document_service = document_service

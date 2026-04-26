@@ -10,7 +10,7 @@ from app.schemas.chat import ChatFilters, ChatScopingInfo, RetrievalDebugChunk, 
 from app.schemas.settings import PersistedSettings
 from app.services.document_service import DocumentService
 from app.services.embeddings.service import EmbeddingService
-from app.services.vectorstore.chroma_store import ChromaVectorStore
+from app.services.vectorstore.base import VectorStore
 from app.services.vectorstore.bm25_store import BM25Store
 from app.services.vectorstore.cross_encoder import CrossEncoderService
 
@@ -37,7 +37,7 @@ class RetrievalService:
     def __init__(
         self,
         embedding_service: EmbeddingService,
-        vector_store: ChromaVectorStore,
+        vector_store: VectorStore,
         bm25_store: BM25Store,
         cross_encoder: CrossEncoderService | None = None,
         chunking_db_path: Path | str | None = None,

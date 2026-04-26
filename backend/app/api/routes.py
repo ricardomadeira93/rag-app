@@ -41,7 +41,7 @@ from app.services.llm.chat_service import ChatService, sse_event
 from app.services.llm.ollama_client import build_ollama_client
 from app.services.settings_service import SettingsService
 from app.services.storage_service import StorageService
-from app.services.vectorstore.chroma_store import ChromaVectorStore
+from app.services.vectorstore.base import VectorStore
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class ServiceContainer:
     ingestion: IngestionPipeline
     chat: ChatService
     conversations: ConversationService
-    vector_store: ChromaVectorStore
+    vector_store: VectorStore
     memory: "MemoryService"
     bm25_store: BM25Store
     cross_encoder: CrossEncoderService

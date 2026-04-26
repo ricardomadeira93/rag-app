@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import AsyncIterator, Protocol
 
@@ -81,6 +82,15 @@ class OllamaChatProvider:
 
 
 def build_llm_provider(settings: PersistedSettings, env: EnvironmentSettings, use_enrichment_model: bool = False) -> LLMProvider:
+    # Cloud AI Override: The Draft Pattern
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if groq_api_key:
+        return LiteLLMChatProvider(
+            provider="groq",
+            model="llama-3.1-8b-instant",
+            api_key=groq_api_key,
+        )
+
     if settings.llm_provider in {"openai", "anthropic"} and not settings.llm_api_key:
         raise ValueError(f"{settings.llm_provider} requires an API key")
 

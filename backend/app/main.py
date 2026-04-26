@@ -24,7 +24,8 @@ from app.services.graph_db import init_graph_db, GraphDBService
 from app.services.ocr.tesseract_service import TesseractOCRService
 from app.services.retrieval_service import RetrievalService
 from app.services.settings_service import SettingsService
-from app.services.vectorstore.chroma_store import ChromaVectorStore
+from app.services.vectorstore.base import VectorStore
+from app.services.vectorstore.router import get_vector_store
 from app.services.vectorstore.bm25_store import BM25Store
 from app.services.vectorstore.cross_encoder import CrossEncoderService
 from app.services.workspace_service import WorkspaceService
@@ -35,7 +36,7 @@ def build_container(env: EnvironmentSettings, bm25_store: BM25Store | None = Non
     workspace_service = WorkspaceService(db_path=conversation_db_path, env=env)
     settings_service = SettingsService(env, workspace_service=workspace_service)
     document_service = DocumentService(env, workspace_service=workspace_service)
-    vector_store = ChromaVectorStore(env)
+    vector_store = get_vector_store(env)
     bm25 = bm25_store or BM25Store(vector_store) # fallback
     memory_service = MemoryService(
         db_path=conversation_db_path,
@@ -107,7 +108,7 @@ async def lifespan(app: FastAPI):
 
     await init_memory_db(db_path)
 
-    vector_store = ChromaVectorStore(env)
+    vector_store = get_vector_store(env)
     bm25 = BM25Store(vector_store)
     bm25.initialize()
     
