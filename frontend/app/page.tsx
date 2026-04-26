@@ -1,3 +1,6 @@
+import LandingPage from "@/app/landing/page";
+
 export default function HomePage() {
-  return null;
+  return <LandingPage />;
 }
+

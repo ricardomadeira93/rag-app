@@ -74,18 +74,21 @@ export function AppFrame({ children }: { children: ReactNode }) {
     }
   }, [onboarded, pathname, refreshing, resolved, router]);
 
-  // Render the actual page immediately — no blocking spinner.
-  // The floating ConnectionStatus card provides feedback while settings load.
-  const content = (
-    <>
-      {!resolved && <ConnectionStatus resolved={resolved} />}
-      {children}
-    </>
-  );
-
-  if (pathname === "/onboarding" || pathname === "/") {
-    return <OnboardingLayout>{content}</OnboardingLayout>;
+  // While settings are loading, render the page content as-is (no layout wrapper)
+  // so the user sees the UI immediately. The card signals the connection state.
+  if (!resolved) {
+    return (
+      <>
+        <ConnectionStatus resolved={false} />
+        {children}
+      </>
+    );
   }
 
-  return <Shell>{content}</Shell>;
+  if (pathname === "/onboarding" || pathname === "/") {
+    return <OnboardingLayout>{children}</OnboardingLayout>;
+  }
+
+  return <Shell>{children}</Shell>;
 }
+
