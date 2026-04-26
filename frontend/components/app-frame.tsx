@@ -9,6 +9,9 @@ import { Shell } from "@/components/shell";
 import { fetchSettings } from "@/lib/api";
 import { applyThemePreference, applyUiTheme, readStoredThemePreference } from "@/lib/ui-theme";
 
+// Pages that render standalone — no Shell, no OnboardingLayout.
+const STANDALONE_PATHS = ["/", "/landing"];
+
 export function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -59,8 +62,8 @@ export function AppFrame({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (pathname === "/") {
-      router.replace(onboarded ? "/dashboard" : "/onboarding");
+    // Landing page is always accessible — never redirect away from it.
+    if (STANDALONE_PATHS.includes(pathname)) {
       return;
     }
 
@@ -85,10 +88,16 @@ export function AppFrame({ children }: { children: ReactNode }) {
     );
   }
 
-  if (pathname === "/onboarding" || pathname === "/") {
+  // Standalone pages render without any app chrome.
+  if (STANDALONE_PATHS.includes(pathname)) {
+    return <>{children}</>;
+  }
+
+  if (pathname === "/onboarding") {
     return <OnboardingLayout>{children}</OnboardingLayout>;
   }
 
   return <Shell>{children}</Shell>;
 }
+
 
