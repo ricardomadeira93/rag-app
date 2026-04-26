@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { ConnectionStatus } from "@/components/connection-status";
 import { OnboardingLayout } from "@/components/onboarding-layout";
 import { Shell } from "@/components/shell";
 import { fetchSettings } from "@/lib/api";
@@ -73,20 +74,18 @@ export function AppFrame({ children }: { children: ReactNode }) {
     }
   }, [onboarded, pathname, refreshing, resolved, router]);
 
-  if (!resolved) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-canvas">
-        <div className="flex items-center gap-3 text-muted">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          <p className="text-sm font-medium">Connecting to server...</p>
-        </div>
-      </div>
-    );
-  }
+  // Render the actual page immediately — no blocking spinner.
+  // The floating ConnectionStatus card provides feedback while settings load.
+  const content = (
+    <>
+      {!resolved && <ConnectionStatus resolved={resolved} />}
+      {children}
+    </>
+  );
 
   if (pathname === "/onboarding" || pathname === "/") {
-    return <OnboardingLayout>{children}</OnboardingLayout>;
+    return <OnboardingLayout>{content}</OnboardingLayout>;
   }
 
-  return <Shell>{children}</Shell>;
+  return <Shell>{content}</Shell>;
 }
