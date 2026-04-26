@@ -559,7 +559,7 @@ export default function LandingPage() {
                   {step.body}
                 </p>
                 <Link
-                  href={step.href}
+                  href={step.href as string & {}}
                   style={{
                     fontSize: 12,
                     fontWeight: 500,
