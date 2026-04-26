@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 from datetime import datetime
 from typing import Any
 
-from pinecone import Pinecone
+from pinecone import Pinecone, ServerlessSpec
 
 from app.core.config import EnvironmentSettings
 from app.core.constants import COLLECTION_NAME
@@ -14,17 +16,27 @@ from app.schemas.settings import EmbeddingSignature
 from app.services.ingestion.chunking import ChunkWithMeta
 from app.services.vectorstore.base import VectorStore
 
+logger = logging.getLogger(__name__)
+
+PINECONE_DIMENSION = 1024  # multilingual-e5-large
+
 
 class PineconeVectorStore(VectorStore):
     def __init__(self, api_key: str) -> None:
         self.pc = Pinecone(api_key=api_key)
-        self.index_name = "stark-index"  # As provided in the prompt
-        
-        # Verify index exists, or you might want to create it
-        if self.index_name not in self.pc.list_indexes().names():
-            # Usually managed outside, but good to know
-            pass
-            
+        self.index_name = os.getenv("PINECONE_INDEX_NAME", "stark-index")
+
+        existing = self.pc.list_indexes().names()
+        if self.index_name not in existing:
+            logger.info("Pinecone index '%s' not found — creating it now…", self.index_name)
+            self.pc.create_index(
+                name=self.index_name,
+                dimension=PINECONE_DIMENSION,
+                metric="cosine",
+                spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+            )
+            logger.info("Pinecone index '%s' created.", self.index_name)
+
         self.index = self.pc.Index(self.index_name)
 
     def upsert_document(
@@ -102,7 +114,7 @@ class PineconeVectorStore(VectorStore):
         # We must list the IDs or use delete by metadata if supported, but Serverless restricts delete by metadata.
         # However, for a simple implementation, assuming namespaces or we keep track of IDs.
         # To mimic Chroma without tracking IDs, we can query top_k=1000 for the document_id and delete those IDs.
-        dummy_vector = [0.0] * 1024 # We assume 1024 dims for multilingual-e5-large
+        dummy_vector = [0.0] * PINECONE_DIMENSION
         while True:
             res = self.index.query(
                 vector=dummy_vector,
@@ -126,7 +138,7 @@ class PineconeVectorStore(VectorStore):
     def get_all_chunks(self, filters: dict[str, Any] | None = None) -> dict[str, Any]:
         # Mimic Chroma's get_all_chunks by querying a large number of docs.
         # This is a limitation of Pinecone compared to Chroma.
-        dummy_vector = [0.0] * 1024
+        dummy_vector = [0.0] * PINECONE_DIMENSION
         pinecone_filter = self._convert_filters(filters)
         
         results = self.index.query(
