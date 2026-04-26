@@ -554,7 +554,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
       ) : null}
 
       {memoryPanelOpen ? (
-        <div className="fixed top-20 right-4 z-30 w-[320px] rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-soft)]">
+        <div className="fixed inset-x-4 top-20 z-30 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-soft)] sm:inset-x-auto sm:right-4 sm:w-[320px]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-[13px] font-medium text-[var(--text-primary)]">
               <Brain className="h-4 w-4" />

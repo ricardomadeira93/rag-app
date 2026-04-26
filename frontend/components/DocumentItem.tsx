@@ -48,7 +48,7 @@ export function DocumentItem({
   return (
     <motion.article variants={fadeUp} initial="hidden" animate="visible" className={`${deleting ? "opacity-50" : ""}`}>
       <div
-        className="grid min-h-[36px] cursor-pointer grid-cols-[20px,minmax(0,1fr),72px,120px,64px,82px,28px] items-center gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-[var(--bg-subtle)]"
+        className="grid min-h-[36px] cursor-pointer grid-cols-[20px,minmax(0,1fr),28px] items-center gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-[var(--bg-subtle)] md:grid-cols-[20px,minmax(0,1fr),72px,120px,64px,82px,28px]"
         onClick={() => onToggle?.(document.id)}
         role="button"
         tabIndex={0}
@@ -88,16 +88,21 @@ export function DocumentItem({
               </Link>
             ) : null}
           </div>
+          {/* On mobile, show status inline under the filename */}
+          <div className="flex items-center gap-2 md:hidden">
+            <StatusBadge status={document.status} />
+            <span className="text-[11px] text-[var(--text-muted)]">{formatRelativeTime(document.created_at)}</span>
+          </div>
           {document.tags && document.tags.length > 0 ? (
             <TagPills tags={document.tags} />
           ) : null}
         </div>
-        <span className="badge justify-self-start">{fileTypeLabel(type)}</span>
-        <StatusBadge status={document.status} />
-        <span className="text-right text-[11px] text-[var(--text-muted)]">
+        <span className="badge hidden justify-self-start md:inline-flex">{fileTypeLabel(type)}</span>
+        <span className="hidden md:block"><StatusBadge status={document.status} /></span>
+        <span className="hidden text-right text-[11px] text-[var(--text-muted)] md:block">
           {document.file_size_bytes > 0 ? formatBytes(document.file_size_bytes) : "—"}
         </span>
-        <span className="text-right text-[11px] text-[var(--text-muted)]">{formatRelativeTime(document.created_at)}</span>
+        <span className="hidden text-right text-[11px] text-[var(--text-muted)] md:block">{formatRelativeTime(document.created_at)}</span>
         <button
           type="button"
           title="Delete"

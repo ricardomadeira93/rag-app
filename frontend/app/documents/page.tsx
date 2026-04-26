@@ -194,8 +194,8 @@ export default function DocumentsPage() {
       ) : null}
 
       <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2">
-        <div className="flex h-8 min-w-[240px] flex-1 items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] px-3">
-          <Search className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+        <div className="flex h-8 min-w-[200px] flex-1 items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] px-3">
+          <Search className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
           <input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
@@ -203,33 +203,34 @@ export default function DocumentsPage() {
             className="h-full flex-1 bg-transparent text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
           />
         </div>
-        <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as DocumentTypeFilter)} className="select w-[120px]">
-          <option value="all">All types</option>
-          <option value="pdf">PDF</option>
-          <option value="audio">Audio</option>
-          <option value="image">Image</option>
-          <option value="markdown">Text</option>
-        </select>
-        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)} className="select w-[140px]">
-          <option value="all">All statuses</option>
-          <option value="indexed">Indexed</option>
-          <option value="processing">Processing</option>
-          <option value="failed">Failed</option>
-          <option value="needs_reprocessing">Needs reindex</option>
-        </select>
-        <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortOption)} className="select w-[104px]">
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="name">Name</option>
-        </select>
-        <span className="mx-1 hidden h-4 w-px bg-[var(--border-soft)] sm:block" />
-        <span className="text-[11px] text-[var(--text-muted)]">
-          {filteredDocuments.length} file{filteredDocuments.length === 1 ? "" : "s"}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as DocumentTypeFilter)} className="select w-[110px]">
+            <option value="all">All types</option>
+            <option value="pdf">PDF</option>
+            <option value="audio">Audio</option>
+            <option value="image">Image</option>
+            <option value="markdown">Text</option>
+          </select>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)} className="select w-[130px]">
+            <option value="all">All statuses</option>
+            <option value="indexed">Indexed</option>
+            <option value="processing">Processing</option>
+            <option value="failed">Failed</option>
+            <option value="needs_reprocessing">Needs reindex</option>
+          </select>
+          <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortOption)} className="select w-[100px]">
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="name">Name</option>
+          </select>
+          <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">
+            {filteredDocuments.length} file{filteredDocuments.length === 1 ? "" : "s"}
+          </span>
+        </div>
       </motion.div>
 
       <motion.section variants={fadeUp} className="panel overflow-hidden">
-        <div className="grid h-10 grid-cols-[20px,minmax(0,1fr),72px,120px,64px,82px,28px] items-center gap-3 border-b border-[var(--border-soft)] px-2 text-[11px] uppercase tracking-[0.06em] text-[var(--text-muted)]">
+        <div className="hidden h-10 grid-cols-[20px,minmax(0,1fr),72px,120px,64px,82px,28px] items-center gap-3 border-b border-[var(--border-soft)] px-2 text-[11px] uppercase tracking-[0.06em] text-[var(--text-muted)] md:grid">
           <span />
           <span>Name</span>
           <span>Type</span>
