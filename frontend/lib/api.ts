@@ -121,7 +121,28 @@ export async function reindexDocuments(): Promise<void> {
 
 export async function clearWorkspaceData(): Promise<{ cleared: boolean; documents_deleted: number }> {
   const response = await fetch(`${API_URL}/maintenance/clear-data`, { method: "POST" });
-  return readJson<{ cleared: boolean; documents_deleted: number }>(response);
+  if (response.ok) {
+    return readJson<{ cleared: boolean; documents_deleted: number }>(response);
+  }
+
+  if (response.status !== 404) {
+    return readJson<{ cleared: boolean; documents_deleted: number }>(response);
+  }
+
+  const [documents, conversations, memories] = await Promise.all([
+    fetchDocuments(),
+    fetchConversations().catch(() => []),
+    fetchMemories().catch(() => []),
+  ]);
+
+  await Promise.all(documents.map((document) => deleteDocument(document.id)));
+  await Promise.all(conversations.map((conversation) => deleteConversation(conversation.id)));
+  await Promise.all(memories.map((memory) => deleteMemory(memory.id)));
+
+  return {
+    cleared: true,
+    documents_deleted: documents.length,
+  };
 }
 
 export async function fetchOllamaStatus(): Promise<OllamaStatus> {
