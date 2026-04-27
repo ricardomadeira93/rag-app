@@ -173,7 +173,7 @@ export default function LandingPage() {
             <p style={{ fontSize: 16, color: "#8b8882", lineHeight: 1.7, marginBottom: 32 }}>
               To demonstrate Stark&apos;s capabilities, we&apos;ve indexed a curated knowledge base consisting of <strong>Ricardo Madeira&apos;s</strong> professional background, technical projects, and engineering philosophy.
             </p>
-            <div style={{ spaceY: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {["12 Documents Indexed", "4 Audio Transcriptions", "Full Technical Case Studies"].map((item, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, color: "#ededea", fontSize: 15, marginBottom: 12 }}>
                   <span style={{ color: "#5b5bd6" }}>✓</span> {item}
