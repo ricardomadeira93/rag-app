@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CornerDownRight, FileText, Bot, X, Lightbulb } from "lucide-react";
+import { Circle, CornerDownRight, FileText, X, Lightbulb } from "lucide-react";
 import Link from "next/link";
 import { Fragment, useState, useEffect } from "react";
 
@@ -54,7 +54,7 @@ export function MessageList({
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="mx-auto flex max-w-[680px] flex-col items-center text-center">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white">
-            <Bot className="h-[18px] w-[18px]" />
+            <Circle className="h-[18px] w-[18px]" />
           </div>
           <h2 className="mt-6 text-[22px] font-semibold tracking-tight text-[var(--text-primary)]">You don&apos;t have any context</h2>
           <p className="mt-1 text-[13px] text-[var(--text-muted)]">{workspaceName}</p>

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Bot, CircleDashed, UserRound } from "lucide-react";
+import { Circle, User } from "lucide-react";
 
 import type { ChatMessage as ChatMessageData } from "@/lib/types";
 
@@ -21,14 +21,14 @@ export function ChatMessage({ message, isStreaming = false }: ChatMessageProps) 
     >
       {!isUser ? (
         <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/80 text-zinc-500 shadow-sm">
-          <Bot className="h-4 w-4" />
+          <Circle className="h-4 w-4" />
         </div>
       ) : null}
 
       <div className={`min-w-0 ${isUser ? "max-w-[78%]" : "max-w-[82%]"}`}>
         <div className={`${isUser ? "workspace-surface bg-white/85 px-4 py-3" : "px-1 py-1"}`}>
           <div className="mb-2 flex items-center gap-2">
-            {isUser ? <UserRound className="h-3.5 w-3.5 text-zinc-400" /> : <CircleDashed className="h-3.5 w-3.5 text-zinc-400" />}
+            {isUser ? <User className="h-3.5 w-3.5 text-zinc-400" /> : <Circle className="h-3.5 w-3.5 text-zinc-400" />}
             <p className="text-xs font-medium uppercase tracking-wide text-muted">{isUser ? "You" : "Assistant"}</p>
           </div>
           <div className="space-y-3 text-sm leading-7 text-ink">
@@ -61,7 +61,7 @@ export function ChatMessage({ message, isStreaming = false }: ChatMessageProps) 
 
       {isUser ? (
         <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500">
-          <UserRound className="h-4 w-4" />
+          <User className="h-4 w-4" />
         </div>
       ) : null}
     </motion.article>

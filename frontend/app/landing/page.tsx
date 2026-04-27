@@ -3,14 +3,14 @@
 import {
   ArrowRight,
   Database,
+  FileCheck,
   FileText,
+  Gauge,
   LayoutDashboard,
+  Layers3,
   MessageSquare,
-  Milestone,
   Search,
-  ShieldCheck,
   Upload,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -24,7 +24,7 @@ const FEATURES = [
     body: "Queries are embedded and matched against indexed document chunks using vector similarity, finding context even without exact keyword matches.",
   },
   {
-    Icon: ShieldCheck,
+    Icon: FileCheck,
     title: "Every answer cites its source",
     tag: "TRUST & VERIFICATION",
     body: "Stark grounds every response in retrieved context. Each answer links to the exact document and chunk it came from to prevent hallucinations.",
@@ -36,7 +36,7 @@ const FEATURES = [
     body: "PDFs, Word docs, Markdown, and images are all parsed, chunked, embedded, and indexed. The engine handles the heavy lifting of extraction.",
   },
   {
-    Icon: Zap,
+    Icon: Gauge,
     title: "Sub-second inference",
     tag: "PERFORMANCE",
     body: "LLM calls run on high-performance infrastructure. Retrieval is near-instant, ensuring the round-trip typically completes in under 2 seconds.",
@@ -46,7 +46,7 @@ const FEATURES = [
 const PIPELINE = [
   { label: "Upload", sub: "PDF / Word / MD", Icon: Upload },
   { label: "Embed", sub: "Multilingual vectors", Icon: Database },
-  { label: "Index", sub: "Pinecone serverless", Icon: Milestone },
+  { label: "Index", sub: "Pinecone serverless", Icon: Layers3 },
   { label: "Retrieve", sub: "Semantic similarity", Icon: Search },
   { label: "Respond", sub: "LLM + citations", Icon: MessageSquare },
 ];

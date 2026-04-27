@@ -8,7 +8,7 @@ import { ToastProvider } from "@/components/toast-provider";
 import { THEME_STORAGE_KEY } from "@/lib/ui-theme";
 
 export const metadata: Metadata = {
-  title: "Local RAG",
+  title: "STARK",
   description: "Local knowledge system",
 };
 

@@ -7,22 +7,19 @@ import {
   ArrowRight, 
   Check, 
   ChevronLeft, 
-  Cpu, 
-  Globe, 
-  Layout, 
-  MessageSquare, 
-  Rocket, 
-  Shield, 
-  User 
+  Lock,
+  SlidersHorizontal,
+  Square,
+  Type,
 } from "lucide-react";
 
 import { fetchSettings, saveSettings } from "@/lib/api";
 import type { ToneLiteral, ResponseLengthLiteral } from "@/lib/types";
 
 const STAGES = [
-  { id: 0, title: "Identity", icon: Layout },
-  { id: 1, title: "Tone", icon: MessageSquare },
-  { id: 2, title: "Intelligence", icon: Cpu },
+  { id: 0, title: "Identity", icon: Square },
+  { id: 1, title: "Tone", icon: Type },
+  { id: 2, title: "Intelligence", icon: SlidersHorizontal },
 ];
 
 export default function OnboardingPage() {
@@ -53,7 +50,8 @@ export default function OnboardingPage() {
         response_length: responseLength,
         onboarding_complete: true,
       });
-      router.push("/dashboard");
+      window.dispatchEvent(new Event("stark:onboarding-complete"));
+      router.replace("/dashboard");
     } catch (err) {
       setError("Failed to save settings. Please try again.");
       setLoading(false);
@@ -226,7 +224,7 @@ export default function OnboardingPage() {
                 <div className="space-y-8">
                   <div className="text-center">
                     <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-light)] text-[var(--accent)]">
-                      <Rocket className="h-8 w-8" />
+                      <Check className="h-8 w-8" />
                     </div>
                     <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">Ready to launch</h1>
                     <p className="mt-2 text-[var(--text-muted)]">Your private intelligence engine is configured and ready.</p>
@@ -248,7 +246,7 @@ export default function OnboardingPage() {
                     </div>
                     <div className="bg-[var(--bg-surface)] p-6 border-t border-[var(--border-soft)]">
                       <div className="flex items-start gap-3">
-                        <Shield className="mt-0.5 h-4 w-4 text-[var(--success)]" />
+                        <Lock className="mt-0.5 h-4 w-4 text-[var(--success)]" />
                         <div>
                           <p className="text-sm font-medium text-[var(--text-primary)]">Enterprise-grade security</p>
                           <p className="text-xs text-[var(--text-muted)]">All data is encrypted in transit and at rest. Your private documents are never used for training models.</p>

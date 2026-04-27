@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowLeft, Brain, Sparkles, X } from "lucide-react";
+import { AlignLeft, ArrowLeft, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { DocumentContent } from "@/components/DocumentContent";
@@ -100,7 +100,7 @@ export function DocumentPage({ documentId }: DocumentPageProps) {
 
               <div className="mt-10 rounded-3xl bg-zinc-100/70 p-5">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-zinc-700 shadow-sm">
-                  {panelMode === "ask" ? <Brain className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+                  {panelMode === "ask" ? <Search className="h-5 w-5" /> : <AlignLeft className="h-5 w-5" />}
                 </div>
                 <p className="mt-5 text-lg font-semibold text-zinc-950">
                   {panelMode === "ask" ? "Ask AI about this document" : "Generate a focused summary"}

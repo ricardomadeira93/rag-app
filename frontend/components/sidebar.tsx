@@ -5,10 +5,10 @@ import {
   Briefcase,
   ChevronRight,
   LayoutDashboard,
+  Link2,
   Library,
   MessageSquare,
   Pin,
-  Plug,
   Plus,
   Settings,
 } from "lucide-react";
@@ -35,7 +35,7 @@ const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat", label: "Chats", icon: MessageSquare },
   { href: "/documents", label: "Documents", icon: Library },
-  { href: "/sources", label: "Sources", icon: Plug },
+  { href: "/sources", label: "Sources", icon: Link2 },
 ] as const;
 
 const transition = { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] } as const;
@@ -48,7 +48,7 @@ type ContextMenuState = {
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [workspaceName, setWorkspaceName] = useState("Local RAG");
+  const [workspaceName, setWorkspaceName] = useState("STARK");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>("default");
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
@@ -62,7 +62,7 @@ export function Sidebar() {
   useEffect(() => {
     void fetchSettings()
       .then((settings) => {
-        setWorkspaceName(settings.workspace_name || "Local RAG");
+        setWorkspaceName(settings.workspace_name || "STARK");
         setActiveWorkspaceId(settings.current_workspace_id || "default");
       })
       .catch(() => null);
@@ -191,7 +191,7 @@ export function Sidebar() {
                 {initial}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{workspaceName || "Local RAG"}</p>
+                <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{workspaceName || "STARK"}</p>
                 <p className="text-[11px] text-[var(--text-muted)]">Workspace</p>
               </div>
             </button>
@@ -338,7 +338,7 @@ export function Sidebar() {
               <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-medium text-white">
                 N
               </div>
-              <span className="text-[12px] text-[var(--text-secondary)]">Local RAG</span>
+              <span className="text-[12px] text-[var(--text-secondary)]">STARK</span>
             </div>
             <Link
               href="/settings"

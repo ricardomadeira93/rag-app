@@ -11,6 +11,7 @@ import { applyThemePreference, applyUiTheme, readStoredThemePreference } from "@
 
 // Pages that render standalone — no Shell, no OnboardingLayout.
 const STANDALONE_PATHS = ["/", "/landing"];
+const ONBOARDING_COMPLETE_EVENT = "stark:onboarding-complete";
 
 export function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -31,7 +32,15 @@ export function AppFrame({ children }: { children: ReactNode }) {
         applyThemePreference(null);
       }
     };
+    const handleOnboardingComplete = () => {
+      if (active) {
+        setOnboarded(true);
+        setResolved(true);
+        setRefreshing(false);
+      }
+    };
     mediaQuery?.addEventListener?.("change", handleThemeChange);
+    window.addEventListener(ONBOARDING_COMPLETE_EVENT, handleOnboardingComplete);
 
     setRefreshing(true);
     fetchSettings()
@@ -54,6 +63,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
     return () => {
       active = false;
       mediaQuery?.removeEventListener?.("change", handleThemeChange);
+      window.removeEventListener(ONBOARDING_COMPLETE_EVENT, handleOnboardingComplete);
     };
   }, [pathname]);
 
@@ -99,5 +109,4 @@ export function AppFrame({ children }: { children: ReactNode }) {
 
   return <Shell>{children}</Shell>;
 }
-
 

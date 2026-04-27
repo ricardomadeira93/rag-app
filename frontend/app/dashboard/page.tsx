@@ -6,9 +6,9 @@ import {
   HardDrive,
   MessageSquare,
   Mic,
-  Search,
-  Sparkles,
   Layers,
+  Search,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -251,7 +251,7 @@ function Hint({
   icon: Icon,
   label,
 }: {
-  icon: typeof Sparkles;
+  icon: LucideIcon;
   label: string;
 }) {
   return (

@@ -33,7 +33,7 @@ import type {
   SourceRecord,
   SourceCitation,
 } from "@/lib/types";
-import { Brain, Search, Pin, PinOff, Trash2, X } from "lucide-react";
+import { BookOpen, Pin, PinOff, Search, Trash2, X } from "lucide-react";
 
 export function ChatShell({ conversationId }: { conversationId?: string }) {
   const router = useRouter();
@@ -558,7 +558,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
         <div className="fixed inset-x-4 top-20 z-30 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-soft)] sm:inset-x-auto sm:right-4 sm:w-[320px]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-[13px] font-medium text-[var(--text-primary)]">
-              <Brain className="h-4 w-4" />
+              <BookOpen className="h-4 w-4" />
               What AI remembers
             </div>
             <button type="button" onClick={() => setMemoryPanelOpen(false)} className="text-[var(--text-muted)]">

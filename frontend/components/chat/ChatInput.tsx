@@ -5,7 +5,7 @@ import {
   AlignLeft,
   AlertCircle,
   AlertTriangle,
-  Brain,
+  BookOpen,
   Calendar,
   CheckSquare,
   ChevronDown,
@@ -21,16 +21,15 @@ import {
   MessageSquare,
   Paperclip,
   PenLine,
-  Plug,
+  Link2,
   Plus,
   RefreshCw,
   Send,
   Settings,
-  Sparkles,
+  SlidersHorizontal,
   Trash2,
   Upload,
   X,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -95,9 +94,9 @@ const COMMANDS = [
   { id: "clear", label: "/clear", description: "Clear this conversation", icon: Trash2, group: "CHAT ACTIONS" },
   { id: "export", label: "/export", description: "Export this conversation", icon: Download, group: "CHAT ACTIONS" },
   { id: "scope", label: "/scope", description: "Scope chat to specific docs", icon: Filter, group: "CHAT ACTIONS" },
-  { id: "memory", label: "/memory", description: "View what AI remembers", icon: Brain, group: "CHAT ACTIONS" },
+  { id: "memory", label: "/memory", description: "View what AI remembers", icon: BookOpen, group: "CHAT ACTIONS" },
   { id: "documents", label: "/documents", description: "Go to documents", icon: Library, group: "NAVIGATION" },
-  { id: "sources", label: "/sources", description: "Go to sources", icon: Plug, group: "NAVIGATION" },
+  { id: "sources", label: "/sources", description: "Go to sources", icon: Link2, group: "NAVIGATION" },
   { id: "settings", label: "/settings", description: "Go to settings", icon: Settings, group: "NAVIGATION" },
 ] as const;
 
@@ -570,7 +569,7 @@ export function ChatInput({
                         : "bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     }`}
                   >
-                    <Zap className={`h-3 w-3 ${semanticRouting ? "fill-white/20" : ""}`} />
+                    <SlidersHorizontal className="h-3 w-3" />
                     Auto
                   </button>
                 ) : null}
@@ -623,7 +622,7 @@ export function ChatInput({
                         {suggestion.kind === "document" ? (
                           <FileIcon type={suggestion.fileType} filename={suggestion.label} className="h-3.5 w-3.5" />
                         ) : (
-                          <Plug className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                          <Link2 className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                         )}
                         <span className="truncate text-[13px]">{suggestion.label}</span>
                         <span className="rounded-full bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[10px]">{suggestion.typeLabel}</span>

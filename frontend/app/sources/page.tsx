@@ -1,6 +1,6 @@
 "use client";
 
-import { Plug, RefreshCw } from "lucide-react";
+import { Link2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { connectSource, fetchSources } from "@/lib/api";
@@ -93,7 +93,7 @@ export default function SourcesPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-light)] text-[var(--accent-text)]">
-                    <Plug className="h-5 w-5" />
+                    <Link2 className="h-5 w-5" />
                   </div>
                   <div>
                     <h2 className="text-base font-medium text-[var(--text-primary)]">{source.name}</h2>

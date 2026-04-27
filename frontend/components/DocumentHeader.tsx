@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Brain, CalendarDays, Download, FileAudio2, FileImage, FileText, FileType2, ScrollText, Sparkles } from "lucide-react";
+import { AlignLeft, CalendarDays, Download, FileAudio2, FileImage, FileText, FileType2, HardDrive, ScrollText, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { fileTypeLabel, formatFileSize, normalizeDocumentType } from "@/lib/documents";
@@ -44,7 +44,7 @@ export function DocumentHeader({ detail, onAskAi, onSummarize }: DocumentHeaderP
               {fileTypeLabel(type)}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3" />
+              <HardDrive className="h-3 w-3" />
               {detail.file_size_bytes !== null ? formatFileSize(detail.file_size_bytes) : "Unknown size"}
             </span>
             <span className="inline-flex items-center gap-1.5">
@@ -56,11 +56,11 @@ export function DocumentHeader({ detail, onAskAi, onSummarize }: DocumentHeaderP
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button variant="secondary" type="button" onClick={onAskAi} className="h-7 text-[12px] px-3">
-            <Brain className="mr-1.5 h-3 w-3" />
+            <Search className="mr-1.5 h-3 w-3" />
             Ask AI
           </Button>
           <Button variant="soft" type="button" onClick={onSummarize} className="h-7 text-[12px] px-3">
-            <Sparkles className="mr-1.5 h-3 w-3" />
+            <AlignLeft className="mr-1.5 h-3 w-3" />
             Summarize
           </Button>
           <Button variant="ghost" type="button" onClick={() => window.open(downloadHref, "_blank", "noopener,noreferrer")} className="h-7 text-[12px] px-3">
