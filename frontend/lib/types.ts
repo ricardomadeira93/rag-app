@@ -1,5 +1,7 @@
 export type LlmProvider = "ollama" | "openai" | "anthropic";
 export type EmbeddingProvider = "ollama" | "openai";
+export type ToneLiteral = "professional" | "balanced" | "casual";
+export type ResponseLengthLiteral = "concise" | "detailed";
 export type ResponseMode = "answer" | "summary" | "extract" | "action_items" | "timeline" | "draft" | "gaps";
 export type ResponseModeOption = {
   value: ResponseMode;
@@ -55,8 +57,8 @@ export type Settings = {
   user_name: string;
   user_role: string;
   language: string;
-  tone: "professional" | "balanced" | "casual";
-  response_length: "concise" | "detailed";
+  tone: ToneLiteral;
+  response_length: ResponseLengthLiteral;
   standing_context: string;
   reindex_required: boolean;
   indexed_documents: number;
