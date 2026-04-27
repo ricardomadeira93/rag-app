@@ -119,6 +119,11 @@ export async function reindexDocuments(): Promise<void> {
   await readJson(response);
 }
 
+export async function clearWorkspaceData(): Promise<{ cleared: boolean; documents_deleted: number }> {
+  const response = await fetch(`${API_URL}/maintenance/clear-data`, { method: "POST" });
+  return readJson<{ cleared: boolean; documents_deleted: number }>(response);
+}
+
 export async function fetchOllamaStatus(): Promise<OllamaStatus> {
   const response = await fetch(`${API_URL}/ollama/status`, { cache: "no-store" });
   return readJson<OllamaStatus>(response);

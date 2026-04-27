@@ -252,6 +252,16 @@ class ConversationService:
             await db.commit()
             return cursor.rowcount > 0
 
+    async def delete_all_conversations(self) -> int:
+        workspace = await self.workspace_service.get_active_workspace()
+        async with get_db(self.db_path) as db:
+            cursor = await db.execute(
+                "DELETE FROM conversations WHERE workspace_id = ?",
+                (workspace.id,),
+            )
+            await db.commit()
+            return cursor.rowcount
+
     @staticmethod
     def auto_title(text: str) -> str:
         """Generate a title from the first 6 words of a message."""

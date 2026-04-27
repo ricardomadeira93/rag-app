@@ -104,3 +104,10 @@ class MemoryService:
             cursor = await db.execute("UPDATE memories SET active = 0 WHERE id = ?", (memory_id,))
             await db.commit()
             return cursor.rowcount > 0
+
+    async def clear_all(self) -> None:
+        async with get_db(self.db_path) as db:
+            await db.execute("DELETE FROM memories")
+            await db.execute("DELETE FROM memory_summaries")
+            await db.execute("DELETE FROM memory_preferences")
+            await db.commit()

@@ -9,7 +9,7 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { StatusBanner } from "@/components/status-banner";
 import { StoragePanel } from "@/components/StoragePanel";
 import { useToast } from "@/components/toast-provider";
-import { deleteDocument, fetchDocuments, fetchSettings, reindexDocuments, saveSettings, fetchMemories, deleteMemory } from "@/lib/api";
+import { clearWorkspaceData, deleteDocument, fetchDocuments, fetchSettings, reindexDocuments, saveSettings, fetchMemories, deleteMemory } from "@/lib/api";
 import type { MemoryItem } from "@/lib/api";
 import type { Settings } from "@/lib/types";
 import { applyUiTheme } from "@/lib/ui-theme";
@@ -26,7 +26,7 @@ export default function SettingsPage() {
   const [chunkCount, setChunkCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<"reset-knowledge" | "reset-onboarding" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"reset-knowledge" | "reset-onboarding" | "clear-data" | null>(null);
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [memoriesLoading, setMemoriesLoading] = useState(false);
 
@@ -145,6 +145,21 @@ export default function SettingsPage() {
       const nextMessage = reason instanceof Error ? reason.message : "Reset failed";
       setMessage(nextMessage);
       pushToast({ tone: "error", title: "Reset failed", description: nextMessage });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleClearWorkspaceData() {
+    setSaving(true);
+    try {
+      await clearWorkspaceData();
+      await load();
+      pushToast({ tone: "success", title: "Workspace data cleared" });
+    } catch (reason) {
+      const nextMessage = reason instanceof Error ? reason.message : "Clear failed";
+      setMessage(nextMessage);
+      pushToast({ tone: "error", title: "Clear failed", description: nextMessage });
     } finally {
       setSaving(false);
     }
@@ -595,6 +610,14 @@ export default function SettingsPage() {
               >
                 Reset knowledge base
               </button>
+              <button
+                type="button"
+                onClick={() => setConfirmAction("clear-data")}
+                disabled={saving}
+                className="inline-flex min-h-[32px] items-center justify-center rounded-lg border border-[color:rgba(220,38,38,0.28)] bg-[var(--danger-light)] px-3 text-[13px] font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Clear all workspace data
+              </button>
             </div>
           </SettingsPanel>
         </div>
@@ -687,6 +710,19 @@ export default function SettingsPage() {
         onConfirm={() => {
           setConfirmAction(null);
           void handleResetOnboarding();
+        }}
+      />
+      <ConfirmDialog
+        open={confirmAction === "clear-data"}
+        title="Clear all workspace data?"
+        description="This deletes documents, vectors, conversations, and AI memory for this app. This cannot be undone."
+        confirmLabel="Clear all data"
+        tone="danger"
+        loading={saving}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          setConfirmAction(null);
+          void handleClearWorkspaceData();
         }}
       />
     </div>

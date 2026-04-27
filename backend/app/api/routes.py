@@ -34,6 +34,7 @@ from app.schemas.workspaces import CreateWorkspaceRequest, WorkspaceSummary
 import logging
 
 from app.schemas.storage import DiskUsageResponse, StorageUsageResponse
+from app.services.chunking_db import get_chunking_db
 from app.services.conversation_service import ConversationService
 from app.services.document_service import DocumentService
 from app.services.ingestion.pipeline import IngestionPipeline
@@ -317,6 +318,44 @@ async def reindex_documents(request: Request) -> ReindexResponse:
         indexed_documents=len(documents),
         embedding_signature=refreshed.embedding_signature,
     )
+
+
+@router.post("/maintenance/clear-data")
+async def clear_workspace_data(request: Request) -> dict[str, int | bool]:
+    container = get_container(request)
+    env = request.app.state.env
+    workspace_id = container.workspaces.get_active_workspace_id_sync()
+    documents = container.documents.list_documents()
+    document_ids = [document.id for document in documents]
+
+    container.vector_store.reset(workspace_id=workspace_id)
+    container.bm25_store.reset(workspace_id=workspace_id)
+    container.documents.replace_all([])
+    await container.conversations.delete_all_conversations()
+    await container.memory.clear_all()
+
+    if document_ids:
+        placeholders = ",".join("?" for _ in document_ids)
+        async with get_chunking_db(env.data_root / "chunks.db") as db:
+            await db.execute(
+                f"DELETE FROM parent_chunks WHERE document_id IN ({placeholders})",
+                document_ids,
+            )
+            await db.commit()
+
+        from app.services.conversation_db import get_db
+
+        async with get_db(env.data_root / "graph.db") as db:
+            await db.execute(
+                f"DELETE FROM graph_edges WHERE source IN ({placeholders}) OR target IN ({placeholders})",
+                document_ids + document_ids,
+            )
+            await db.commit()
+
+    return {
+        "cleared": True,
+        "documents_deleted": len(document_ids),
+    }
 
 
 @router.get("/settings")
