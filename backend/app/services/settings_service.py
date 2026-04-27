@@ -64,12 +64,21 @@ class SettingsService:
 
     def to_response(self, indexed_documents: int) -> SettingsResponse:
         settings = self.get_settings()
+        
+        # Calculate recommended models based on provider
+        recommended = ["llama3.1:8b", "qwen2.5:7b", "mistral-nemo"]
+        if settings.llm_provider == "openai":
+            recommended = ["gpt-4o", "gpt-4o-mini", "o1-mini", "gpt-3.5-turbo"]
+        elif settings.llm_provider == "anthropic":
+            recommended = ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-haiku-20240307"]
+            
         return SettingsResponse(
             **settings.model_dump(),
             indexed_documents=indexed_documents,
             current_embedding_signature=settings.embedding_signature,
             supported_llm_providers=["ollama", "openai", "anthropic"],
             supported_embedding_providers=["ollama", "openai"],
+            recommended_chat_models=recommended,
         )
 
     def _get_active_workspace_id(self) -> str:

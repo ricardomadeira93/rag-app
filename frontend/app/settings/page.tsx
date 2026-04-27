@@ -71,14 +71,6 @@ export default function SettingsPage() {
     [settings?.llm_provider],
   );
 
-  function aiModeCardClass(selected: boolean) {
-    return [
-      "panel p-4 text-left transition-colors duration-150",
-      selected
-        ? "border-[var(--accent)] bg-[var(--accent-light)] text-[var(--accent-text)]"
-        : "hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]",
-    ].join(" ");
-  }
 
   async function handleSave() {
     if (!settings) {
@@ -206,51 +198,97 @@ export default function SettingsPage() {
 
       {activeTab === "Advanced" ? (
         <div className="space-y-4">
-          <SettingsPanel title="Primary AI Model" description="The main brain used for complex questions and analytical reasoning.">
+          <SettingsPanel title="AI Engine" description="Choose between local-first privacy or high-performance cloud models.">
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-[var(--text-primary)]">Provider</span>
-                <select
-                  value={settings.llm_provider}
-                  onChange={(event) => updateField("llm_provider", event.target.value as Settings["llm_provider"])}
-                  className="input"
-                >
-                  <option value="ollama">Local (Ollama)</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                </select>
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-[var(--text-primary)]">Chat Model</span>
-                <input
-                  list="chat-models"
-                  value={settings.llm_model}
-                  onChange={(event) => updateField("llm_model", event.target.value)}
-                  className="input"
-                  placeholder="e.g. llama3.1:8b"
-                />
-                <datalist id="chat-models">
-                  {settings.recommended_chat_models?.map(m => <option key={m} value={m} />)}
-                </datalist>
-              </label>
-              {settings.llm_provider !== "ollama" ? (
-                <label className="space-y-2 md:col-span-2">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">Answer API key</span>
-                  <input
-                    type="password"
-                    value={settings.llm_api_key ?? ""}
-                    onChange={(event) => updateField("llm_api_key", event.target.value)}
-                    placeholder="Required for the selected provider"
-                    className="input"
-                  />
+              <button
+                type="button"
+                onClick={() => {
+                  updateField("llm_provider", "ollama");
+                  updateField("embedding_provider", "ollama");
+                }}
+                className={`panel flex flex-col items-start gap-2 p-4 text-left transition-all ${
+                  settings.llm_provider === "ollama"
+                    ? "border-[var(--accent)] bg-[var(--accent-light)] ring-1 ring-[var(--accent)]"
+                    : "border-[var(--border-soft)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]"
+                }`}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className={`text-[13px] font-bold ${settings.llm_provider === "ollama" ? "text-[var(--accent-text)]" : "text-[var(--text-primary)]"}`}>Local Engine</span>
+                  {settings.llm_provider === "ollama" && <div className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                </div>
+                <p className={`text-[12px] leading-5 ${settings.llm_provider === "ollama" ? "text-[var(--accent-text)] opacity-80" : "text-[var(--text-secondary)]"}`}>
+                  Everything stays on your device. Powered by Ollama. Best for privacy.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  updateField("llm_provider", "openai");
+                  updateField("embedding_provider", "openai");
+                }}
+                className={`panel flex flex-col items-start gap-2 p-4 text-left transition-all ${
+                  settings.llm_provider !== "ollama"
+                    ? "border-[var(--accent)] bg-[var(--accent-light)] ring-1 ring-[var(--accent)]"
+                    : "border-[var(--border-soft)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-subtle)]"
+                }`}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className={`text-[13px] font-bold ${settings.llm_provider !== "ollama" ? "text-[var(--accent-text)]" : "text-[var(--text-primary)]"}`}>Cloud Engine</span>
+                  {settings.llm_provider !== "ollama" && <div className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                </div>
+                <p className={`text-[12px] leading-5 ${settings.llm_provider !== "ollama" ? "text-[var(--accent-text)] opacity-80" : "text-[var(--text-secondary)]"}`}>
+                  High-speed, state-of-the-art models. Requires an external API key.
+                </p>
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-4 border-t border-[var(--border-soft)] pt-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-[var(--text-primary)]">Model Provider</span>
+                  <select
+                    value={settings.llm_provider}
+                    onChange={(event) => updateField("llm_provider", event.target.value as Settings["llm_provider"])}
+                    className="select"
+                  >
+                    <option value="ollama">Ollama (Local)</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                  </select>
                 </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-[var(--text-primary)]">Chat Model</span>
+                  <input
+                    list="chat-models"
+                    value={settings.llm_model}
+                    onChange={(event) => updateField("llm_model", event.target.value)}
+                    className="input"
+                    placeholder="e.g. gpt-4o or llama3"
+                  />
+                  <datalist id="chat-models">
+                    {settings.recommended_chat_models?.map(m => <option key={m} value={m} />)}
+                  </datalist>
+                </label>
+                {settings.llm_provider !== "ollama" ? (
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-medium text-[var(--text-primary)]">API Key</span>
+                    <input
+                      type="password"
+                      value={settings.llm_api_key ?? ""}
+                      onChange={(event) => updateField("llm_api_key", event.target.value)}
+                      placeholder={`Enter your ${settings.llm_provider} API key`}
+                      className="input"
+                    />
+                  </label>
+                ) : null}
+              </div>
+              {settings.llm_provider === "ollama" ? (
+                <div className="mt-2">
+                  <OllamaStatus enabled buttonLabel="Check connection" />
+                </div>
               ) : null}
             </div>
-            {settings.llm_provider === "ollama" ? (
-              <div className="mt-4 border-t border-[var(--border-soft)] pt-4">
-                <OllamaStatus enabled buttonLabel="Check connection" />
-              </div>
-            ) : null}
           </SettingsPanel>
 
           <SettingsPanel title="Orchestration & Routing" description="Configure automatic model switching and ingestion processing pipelines.">

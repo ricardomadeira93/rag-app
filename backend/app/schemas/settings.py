@@ -13,7 +13,7 @@ ToneLiteral = Literal["professional", "balanced", "casual"]
 ResponseLengthLiteral = Literal["concise", "detailed"]
 
 DEFAULT_UI_FONT_SIZE = 15
-DEFAULT_UI_ACCENT = "#2563eb"
+DEFAULT_UI_ACCENT = "#ff5a1f"
 HEX_COLOR_PATTERN = re.compile(r"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 def utc_now_iso() -> str:
@@ -136,6 +136,6 @@ class SettingsResponse(PersistedSettings):
     current_embedding_signature: EmbeddingSignature
     supported_llm_providers: list[LLMProviderLiteral]
     supported_embedding_providers: list[EmbeddingProviderLiteral]
-    recommended_chat_models: list[str] = Field(default_factory=lambda: ["llama3.1:8b", "qwen2.5:7b", "mistral-nemo"])
+    recommended_chat_models: list[str] = Field(default_factory=lambda: ["gpt-4o", "llama3.1:8b", "claude-3-5-sonnet-20240620"])
     recommended_enrichment_models: list[str] = Field(default_factory=lambda: ["llama3.2:3b", "llama3.2:1b", "qwen2.5:1.5b"])
     recommended_embedding_models: list[str] = Field(default_factory=lambda: ["nomic-embed-text"])
