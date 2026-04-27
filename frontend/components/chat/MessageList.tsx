@@ -11,6 +11,8 @@ import { QUICK_MODE_PROMPTS, type ChatMessage, type DocumentRecord, type Respons
 type MessageListProps = {
   messages: ChatMessage[];
   isStreaming: boolean;
+  isBootstrapping?: boolean;
+  isConversationLoading?: boolean;
   workspaceName?: string;
   suggestions: string[];
   recentDocuments: DocumentRecord[];
@@ -27,6 +29,8 @@ type MessageListProps = {
 export function MessageList({
   messages,
   isStreaming,
+  isBootstrapping = false,
+  isConversationLoading = false,
   workspaceName = "Workspace",
   suggestions,
   recentDocuments,
@@ -47,6 +51,30 @@ export function MessageList({
   function handleDismissHints() {
     setHintsDismissed(true);
     window.localStorage.setItem("hints_dismissed", "true");
+  }
+
+  if (messages.length === 0 && (isBootstrapping || isConversationLoading)) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-4 py-12">
+        <div className="mx-auto flex max-w-[680px] flex-col items-center text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+            <Circle className="h-[18px] w-[18px] animate-pulse" />
+          </div>
+          <h2 className="mt-6 text-[22px] font-semibold tracking-tight text-[var(--text-primary)]">
+            Loading your workspace
+          </h2>
+          <p className="mt-1 max-w-md text-[13px] leading-6 text-[var(--text-muted)]">
+            Connecting to documents, sources, and conversation history. The composer stays available while the backend warms up.
+          </p>
+
+          <div className="mt-8 grid w-full gap-3 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="panel h-[84px] animate-pulse bg-[var(--bg-subtle)]" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (messages.length === 0) {

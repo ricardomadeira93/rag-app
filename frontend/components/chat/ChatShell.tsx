@@ -58,6 +58,8 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
   const [deletingConversation, setDeletingConversation] = useState(false);
   const [memoryPanelOpen, setMemoryPanelOpen] = useState(false);
   const [memories, setMemories] = useState<Array<{ id: string; fact: string }>>([]);
+  const [bootstrapping, setBootstrapping] = useState(true);
+  const [conversationLoading, setConversationLoading] = useState(Boolean(conversationId));
 
   useEffect(() => {
     void Promise.all([fetchSettings(), fetchDocuments(), fetchSources().catch(() => [])])
@@ -66,7 +68,8 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
         setDocuments(nextDocuments);
         setSources(nextSources);
       })
-      .catch((reason: Error) => setError(reason.message));
+      .catch((reason: Error) => setError(reason.message))
+      .finally(() => setBootstrapping(false));
   }, []);
 
   useEffect(() => {
@@ -84,6 +87,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
   // Fetch messages if a conversation ID is provided
   useEffect(() => {
     if (conversationId) {
+      setConversationLoading(true);
       void Promise.all([
         fetchMessages(conversationId),
         fetchConversation(conversationId).catch(() => null)
@@ -99,10 +103,12 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
           rating: msg.rating
         })));
         if (meta) setConversationMeta(meta);
-      }).catch(() => setError("Failed to load conversation history"));
+      }).catch(() => setError("Failed to load conversation history"))
+        .finally(() => setConversationLoading(false));
     } else {
       setMessages([]);
       setConversationMeta(null);
+      setConversationLoading(false);
     }
   }, [conversationId]);
 
@@ -511,6 +517,8 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
         <MessageList
           messages={displayedMessages}
           isStreaming={loading}
+          isBootstrapping={bootstrapping}
+          isConversationLoading={conversationLoading}
           workspaceName={settings?.workspace_name || "Workspace"}
           suggestions={suggestions}
           recentDocuments={recentDocuments}
