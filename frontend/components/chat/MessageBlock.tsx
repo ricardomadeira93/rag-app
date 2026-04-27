@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { SourceCard } from "@/components/SourceCard";
 import { RESPONSE_MODE_OPTIONS, type ChatMessage, type DocumentRecord, type ResponseMode } from "@/lib/types";
@@ -334,12 +336,6 @@ function relevanceClasses(similarity: number) {
   return "border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)]";
 }
 
-type ContentBlock =
-  | { type: "paragraph"; content: string }
-  | { type: "list"; items: string[] }
-  | { type: "code"; content: string }
-  | { type: "heading"; content: string };
-
 function renderResponseContent(message: ChatMessage, isUser: boolean, allDocuments: DocumentRecord[]) {
   if (!isUser && message.modeUsed === "action_items") {
     return <ActionItemsView content={message.content} allDocuments={allDocuments} />;
@@ -351,109 +347,62 @@ function renderResponseContent(message: ChatMessage, isUser: boolean, allDocumen
 }
 
 function renderContent(content: string, isUser: boolean, allDocuments: DocumentRecord[]) {
-  const blocks = parseContent(content);
-  const paragraphClass = isUser ? "text-[13px] leading-[1.6] text-[var(--text-primary)]" : "text-[13px] leading-[1.6] text-[var(--text-secondary)]";
+  const renderedContent = preprocessContent(content, allDocuments);
+  const textClass = isUser ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]";
 
-  return blocks.map((block, index) => (
-    <div key={`${block.type}-${index}`}>
-      {block.type === "heading" ? (
-        <p className="text-[13px] font-semibold text-[var(--text-primary)]">{block.content}</p>
-      ) : null}
-      {block.type === "paragraph" ? <p className={`whitespace-pre-wrap ${paragraphClass}`}>{renderInlineMentions(block.content, allDocuments)}</p> : null}
-      {block.type === "list" ? (
-        <ul className="space-y-1.5">
-          {block.items.map((item) => (
-            <li key={item} className={`flex gap-2 ${paragraphClass}`}>
-              <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[var(--text-muted)]" />
-              <span>{renderInlineMentions(item, allDocuments)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {block.type === "code" ? (
-        <pre className="overflow-x-auto rounded bg-[var(--bg-raised)] px-3 py-2 text-[12px] leading-5 text-[var(--text-primary)]">
-          <code>{block.content}</code>
-        </pre>
-      ) : null}
+  return (
+    <div className={`space-y-3 text-[13px] leading-6 ${textClass}`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <p className="whitespace-pre-wrap leading-7">{children}</p>,
+          h1: ({ children }) => <h1 className="text-[17px] font-semibold tracking-tight text-[var(--text-primary)]">{children}</h1>,
+          h2: ({ children }) => <h2 className="pt-1 text-[15px] font-semibold text-[var(--text-primary)]">{children}</h2>,
+          h3: ({ children }) => <h3 className="pt-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)]">{children}</h3>,
+          ul: ({ children }) => <ul className="list-disc space-y-2 pl-5 marker:text-[var(--text-muted)]">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal space-y-2 pl-5 marker:font-medium marker:text-[var(--text-muted)]">{children}</ol>,
+          li: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold text-[var(--text-primary)]">{children}</strong>,
+          em: ({ children }) => <em className="italic text-[var(--text-secondary)]">{children}</em>,
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 border-[var(--border-strong)] pl-4 text-[var(--text-muted)]">
+              {children}
+            </blockquote>
+          ),
+          code: ({ className, children }) =>
+            className ? (
+              <code className={className}>{children}</code>
+            ) : (
+              <code className="rounded bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[12px] text-[var(--text-primary)]">{children}</code>
+            ),
+          pre: ({ children }) => (
+            <pre className="overflow-x-auto rounded-xl border border-[var(--border-soft)] bg-[var(--bg-raised)] px-3 py-3 text-[12px] leading-6 text-[var(--text-primary)]">
+              {children}
+            </pre>
+          ),
+          a: ({ href, children }) => {
+            if (!href) {
+              return <span>{children}</span>;
+            }
+            if (href.startsWith("/")) {
+              return (
+                <Link href={href as any} className="font-medium text-[var(--accent)] underline underline-offset-2 hover:text-[var(--accent-text)]">
+                  {children}
+                </Link>
+              );
+            }
+            return (
+              <a href={href} target="_blank" rel="noreferrer" className="font-medium text-[var(--accent)] underline underline-offset-2 hover:text-[var(--accent-text)]">
+                {children}
+              </a>
+            );
+          },
+        }}
+      >
+        {renderedContent}
+      </ReactMarkdown>
     </div>
-  ));
-}
-
-function parseContent(content: string): ContentBlock[] {
-  const lines = content.split("\n");
-  const blocks: ContentBlock[] = [];
-  let paragraphBuffer: string[] = [];
-  let listBuffer: string[] = [];
-  let codeBuffer: string[] = [];
-  let inCode = false;
-
-  function flushParagraph() {
-    const joined = paragraphBuffer.join(" ").replace(/\s+/g, " ").trim();
-    if (joined) {
-      blocks.push({ type: "paragraph", content: joined });
-    }
-    paragraphBuffer = [];
-  }
-
-  function flushList() {
-    if (listBuffer.length > 0) {
-      blocks.push({ type: "list", items: listBuffer });
-      listBuffer = [];
-    }
-  }
-
-  function flushCode() {
-    if (codeBuffer.length > 0) {
-      blocks.push({ type: "code", content: codeBuffer.join("\n") });
-      codeBuffer = [];
-    }
-  }
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("```")) {
-      flushParagraph();
-      flushList();
-      if (inCode) {
-        flushCode();
-        inCode = false;
-      } else {
-        inCode = true;
-      }
-      continue;
-    }
-    if (inCode) {
-      codeBuffer.push(line);
-      continue;
-    }
-    if (!trimmed) {
-      flushParagraph();
-      flushList();
-      continue;
-    }
-    if (trimmed.startsWith("## ")) {
-      flushParagraph();
-      flushList();
-      blocks.push({ type: "heading", content: trimmed.replace(/^##\s+/, "") });
-      continue;
-    }
-    if (trimmed.startsWith("- ")) {
-      flushParagraph();
-      listBuffer.push(trimmed.slice(2));
-      continue;
-    }
-    paragraphBuffer.push(line);
-  }
-
-  flushParagraph();
-  flushList();
-  flushCode();
-
-  if (blocks.length === 0 && content.trim()) {
-    blocks.push({ type: "paragraph", content: content.trim() });
-  }
-
-  return blocks;
+  );
 }
 
 function ActionItemsView({ content, allDocuments }: { content: string; allDocuments: DocumentRecord[] }) {
@@ -506,7 +455,7 @@ function ActionItemsView({ content, allDocuments }: { content: string; allDocume
                 }
                 className="mt-0.5 h-3.5 w-3.5 rounded border-[var(--border-soft)]"
               />
-              <span className={checkedItems[index] ? "line-through" : ""}>{renderInlineMentions(item, allDocuments)}</span>
+              <span className={checkedItems[index] ? "line-through" : ""}>{item}</span>
             </label>
           ))}
         </div>
@@ -547,7 +496,7 @@ function TimelineView({ content, allDocuments }: { content: string; allDocuments
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${timelinePillClass(event.date)}`}>{event.date}</span>
               {event.source ? <span className="rounded-full bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{event.source}</span> : null}
             </div>
-            <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">{renderInlineMentions(event.description, allDocuments)}</p>
+            <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">{event.description}</p>
           </div>
         ))}
       </div>
@@ -614,46 +563,18 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function renderInlineMentions(content: string, allDocuments: DocumentRecord[]) {
-  const parts = content.split(/(\[@[^\]]+\]|\[#[^\]]+\])/g).filter(Boolean);
-  return parts.map((part, index) => {
-    const docMatch = part.match(/^\[@(.+)\]$/);
-    if (docMatch) {
-      const label = docMatch[1];
-      const document = allDocuments.find((item) => item.filename === label);
-      return document ? (
-        <Link
-          key={`${part}-${index}`}
-          href={`/documents/${document.id}`}
-          className="mx-[1px] inline-flex items-center gap-1 rounded-lg bg-[var(--accent-light)] px-2 py-0.5 text-[12px] text-[var(--accent-text)]"
-        >
-          <FileText className="h-3 w-3" />
-          {label}
-        </Link>
-      ) : (
-        <span key={`${part}-${index}`} className="mx-[1px] inline-flex items-center gap-1 rounded-lg bg-[var(--accent-light)] px-2 py-0.5 text-[12px] text-[var(--accent-text)]">
-          <FileText className="h-3 w-3" />
-          {label}
-        </span>
-      );
+function preprocessContent(content: string, allDocuments: DocumentRecord[]) {
+  return content.replace(/\[@([^\]]+)\]|\[#([^\]]+)\]/g, (match, docLabel: string | undefined, tagLabel: string | undefined) => {
+    if (docLabel) {
+      const document = allDocuments.find((item) => item.filename === docLabel);
+      return document ? `[${docLabel}](/documents/${document.id})` : `\`@${docLabel}\``;
     }
 
-    const tagMatch = part.match(/^\[#(.+)\]$/);
-    if (tagMatch) {
-      const label = tagMatch[1];
-      return (
-        <Link
-          key={`${part}-${index}`}
-          href={`/documents?tag=${encodeURIComponent(label)}`}
-          className="mx-[1px] inline-flex items-center gap-1 rounded-lg bg-purple-50 px-2 py-0.5 text-[12px] text-purple-700"
-        >
-          <Hash className="h-3 w-3" />
-          {label}
-        </Link>
-      );
+    if (tagLabel) {
+      return `[#${tagLabel}](/documents?tag=${encodeURIComponent(tagLabel)})`;
     }
 
-    return <span key={`${part}-${index}`}>{part}</span>;
+    return match;
   });
 }
 

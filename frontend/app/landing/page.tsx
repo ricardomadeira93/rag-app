@@ -91,7 +91,7 @@ export default function LandingPage() {
 
           <ThemeToggle />
 
-          <Link href="/chat" className="landing-cta-sm">
+          <Link href="/dashboard" className="landing-cta-sm">
             Open assistant <ArrowRight size={12} strokeWidth={2} />
           </Link>
         </div>
@@ -110,7 +110,7 @@ export default function LandingPage() {
         </p>
 
         <div className="landing-cta-row">
-          <Link href="/chat" className="landing-btn-primary">
+          <Link href="/dashboard" className="landing-btn-primary">
             Start chatting
           </Link>
           <Link href="/dashboard" className="landing-btn-secondary">
@@ -192,7 +192,7 @@ export default function LandingPage() {
             The assistant is ready to index your documents. 
             Every answer comes with a verifiable source.
           </p>
-          <Link href="/chat" className="landing-btn-primary landing-btn-primary--lg">
+          <Link href="/dashboard" className="landing-btn-primary landing-btn-primary--lg">
             Launch Assistant
           </Link>
         </div>

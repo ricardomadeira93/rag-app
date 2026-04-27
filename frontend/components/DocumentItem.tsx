@@ -78,7 +78,7 @@ export function DocumentItem({
             </span>
             {document.conflicting_docs.length > 0 ? (
               <Link
-                href={`/chat?documents=${document.id},${document.conflicting_docs[0]?.doc_id}&prompt=${encodeURIComponent(`Do ${document.filename} and ${document.conflicting_docs[0]?.filename} contradict each other?`)}`}
+                href={`/dashboard?documents=${document.id},${document.conflicting_docs[0]?.doc_id}&prompt=${encodeURIComponent(`Do ${document.filename} and ${document.conflicting_docs[0]?.filename} contradict each other?`)}`}
                 onClick={(event) => event.stopPropagation()}
                 title={`This document may conflict with ${document.conflicting_docs[0]?.filename}`}
                 className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
@@ -167,7 +167,7 @@ export function DocumentItem({
                         {document.conflicting_docs.map((conflict) => (
                           <Link
                             key={`${conflict.doc_id}-${conflict.reason}`}
-                            href={`/chat?documents=${document.id},${conflict.doc_id}&prompt=${encodeURIComponent(`Find conflicts between ${document.filename} and ${conflict.filename}`)}`}
+                            href={`/dashboard?documents=${document.id},${conflict.doc_id}&prompt=${encodeURIComponent(`Find conflicts between ${document.filename} and ${conflict.filename}`)}`}
                             className="block rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800"
                             onClick={(event) => event.stopPropagation()}
                           >

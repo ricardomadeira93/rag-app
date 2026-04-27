@@ -3,11 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Briefcase,
-  ChevronRight,
   LayoutDashboard,
   Link2,
   Library,
-  MessageSquare,
   Pin,
   Plus,
   Settings,
@@ -33,7 +31,6 @@ import type { Conversation, Workspace } from "@/lib/types";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/chat", label: "Chats", icon: MessageSquare },
   { href: "/documents", label: "Documents", icon: Library },
   { href: "/sources", label: "Sources", icon: Link2 },
 ] as const;
@@ -53,7 +50,6 @@ export function Sidebar() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>("default");
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [chatsOpen, setChatsOpen] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [activeSourcesCount, setActiveSourcesCount] = useState(0);
@@ -104,8 +100,8 @@ export function Sidebar() {
     try {
       await deleteConversation(confirmDeleteId);
       setConversations((prev) => prev.filter((c) => c.id !== confirmDeleteId));
-      if (pathname === `/chat/${confirmDeleteId}`) {
-        router.push("/chat");
+      if (pathname === `/dashboard/${confirmDeleteId}`) {
+        router.push("/dashboard");
       }
     } catch {
       // Ignore
@@ -149,7 +145,7 @@ export function Sidebar() {
   const confirmConversation = conversations.find((c) => c.id === confirmDeleteId) ?? null;
 
   function renderConversationItem(conversation: Conversation, index: number) {
-    const isActive = pathname === `/chat/${conversation.id}`;
+    const isActive = pathname === `/dashboard/${conversation.id}`;
     return (
       <motion.div
         key={conversation.id}
@@ -160,7 +156,7 @@ export function Sidebar() {
         onContextMenu={(e) => handleContextMenu(e, conversation.id)}
       >
         <Link
-          href={`/chat/${conversation.id}`}
+          href={`/dashboard/${conversation.id}`}
           title={conversation.title}
           className={`ml-7 flex h-7 items-center justify-between rounded-lg px-2 text-[12px] transition-colors pr-6 ${
             isActive
@@ -202,7 +198,7 @@ export function Sidebar() {
               type="button"
               title="New chat"
               aria-label="New chat"
-              onClick={() => router.push("/chat")}
+              onClick={() => router.push("/dashboard")}
               className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-active)] hover:text-[var(--text-primary)]"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -253,68 +249,6 @@ export function Sidebar() {
               </>
             );
 
-            if (item.href === "/chat") {
-              return (
-                <div key={item.href}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      router.push("/chat");
-                      setChatsOpen((current) => !current);
-                    }}
-                    className={`sidebar-item w-[calc(100%-16px)] justify-between ${active ? "sidebar-item-active" : ""}`}
-                  >
-                    <span className="flex items-center gap-[10px]">{content}</span>
-                    <motion.span animate={{ rotate: chatsOpen ? 90 : 0 }} transition={transition}>
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </motion.span>
-                  </button>
-
-                  <AnimatePresence initial={false}>
-                    {chatsOpen ? (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={transition}
-                        className="overflow-hidden"
-                      >
-                        <div className="mt-1 space-y-0.5">
-                          {/* Pinned conversations */}
-                          {pinnedConversations.length > 0 ? (
-                            <>
-                              <p className="ml-8 mt-1 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                                Pinned
-                              </p>
-                              {pinnedConversations.map((c, i) => renderConversationItem(c, i))}
-                              {recentConversations.length > 0 ? (
-                                <p className="ml-8 mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-                                  Recent
-                                </p>
-                              ) : null}
-                            </>
-                          ) : null}
-
-                          {/* Recent conversations */}
-                          {recentConversations.map((c, i) =>
-                            renderConversationItem(c, i + pinnedConversations.length),
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => router.push("/chat")}
-                            className="ml-7 flex h-7 items-center rounded-lg px-2 text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--accent-text)]"
-                          >
-                            + New chat
-                          </button>
-                        </div>
-                      </motion.div>
-                    ) : null}
-                  </AnimatePresence>
-                </div>
-              );
-            }
-
             return (
               <Link key={item.href} href={item.href} className={`sidebar-item flex justify-between w-[calc(100%-16px)] ${active ? "sidebar-item-active" : ""}`}>
                 {content}
@@ -330,6 +264,39 @@ export function Sidebar() {
             <span>Settings</span>
           </Link>
         </nav>
+
+        <div className="mt-6 space-y-0.5">
+          <div className="flex items-center justify-between px-2">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+              Conversations
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard")}
+              className="text-[12px] text-[var(--text-muted)] transition-colors hover:text-[var(--accent-text)]"
+            >
+              + New
+            </button>
+          </div>
+
+          {pinnedConversations.length > 0 ? (
+            <>
+              <p className="ml-8 mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                Pinned
+              </p>
+              {pinnedConversations.map((c, i) => renderConversationItem(c, i))}
+            </>
+          ) : null}
+
+          {recentConversations.length > 0 ? (
+            <>
+              <p className="ml-8 mt-2 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                Recent
+              </p>
+              {recentConversations.map((c, i) => renderConversationItem(c, i + pinnedConversations.length))}
+            </>
+          ) : null}
+        </div>
 
         <div className="mt-auto pt-4">
           <div className="mb-3 border-t border-[var(--sidebar-border)]" />

@@ -163,7 +163,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
         targetConvId = conv.id;
         setActiveConversationId(targetConvId);
         // Soft replace URL to avoid interrupting stream
-        window.history.replaceState(null, "", `/chat/${targetConvId}`);
+        window.history.replaceState(null, "", `/dashboard/${targetConvId}`);
       } catch (err) {
         setError("Failed to initialize conversation");
         return;
@@ -311,7 +311,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
       setActiveConversationId(null);
       setConversationMeta(null);
       setDeleteConfirmOpen(false);
-      router.push("/chat");
+      router.push("/dashboard");
     } catch {
       setError("Failed to delete chat");
     } finally {
@@ -541,7 +541,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
                 setActiveConversationId(null);
                 setConversationMeta(null);
                 setClearConfirmOpen(false);
-                router.push("/chat");
+                router.push("/dashboard");
               }}
               className="rounded-md bg-[var(--accent)] px-2 py-1 text-white"
             >

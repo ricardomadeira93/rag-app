@@ -153,7 +153,7 @@ export function DocumentContent({ detail }: DocumentContentProps) {
                     {detail.item.conflicting_docs.map((conflict) => (
                       <Link
                         key={`${conflict.doc_id}-${conflict.reason}`}
-                        href={`/chat?documents=${detail.item.id},${conflict.doc_id}&prompt=${encodeURIComponent(`Find conflicts between ${detail.item.filename} and ${conflict.filename}`)}`}
+                        href={`/dashboard?documents=${detail.item.id},${conflict.doc_id}&prompt=${encodeURIComponent(`Find conflicts between ${detail.item.filename} and ${conflict.filename}`)}`}
                         className="block rounded-lg bg-white/80 px-3 py-2 text-[12px] text-amber-900"
                       >
                         <div className="font-medium">{conflict.filename}</div>

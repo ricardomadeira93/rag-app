@@ -44,7 +44,7 @@ async function fetchSearchResults(query: string): Promise<SearchResult[]> {
         type: "conversation",
         id: c.id,
         title: c.title || "Untitled Conversation",
-        href: `/chat/${c.id}`,
+        href: `/dashboard/${c.id}`,
       }));
 
     return [...docResults, ...convResults];

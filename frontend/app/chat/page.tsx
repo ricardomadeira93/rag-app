@@ -1,12 +1,5 @@
-import { Suspense } from "react";
-
-import { ChatShell } from "@/components/chat/ChatShell";
+import { redirect } from "next/navigation";
 
 export default function ChatPage() {
-  return (
-    <Suspense>
-      <ChatShell />
-    </Suspense>
-  );
+  redirect("/dashboard");
 }
-

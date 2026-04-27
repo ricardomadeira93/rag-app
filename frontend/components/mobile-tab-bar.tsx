@@ -1,12 +1,11 @@
 "use client";
 
-import { LayoutDashboard, Library, MessageSquare, Settings } from "lucide-react";
+import { LayoutDashboard, Library, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/chat", icon: MessageSquare, label: "Chats" },
   { href: "/documents", icon: Library, label: "Documents" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ] as const;

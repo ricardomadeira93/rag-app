@@ -21,7 +21,7 @@ export function Shell({ children }: { children: ReactNode }) {
       }
       if (meta && event.key.toLowerCase() === "n") {
         event.preventDefault();
-        router.push("/chat");
+        router.push("/dashboard");
       }
       if (meta && event.key.toLowerCase() === "u") {
         event.preventDefault();
