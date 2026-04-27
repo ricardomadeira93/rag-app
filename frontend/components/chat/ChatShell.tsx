@@ -194,6 +194,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
           mentioned_doc_ids: submission.mentionedDocIds,
           tags: submission.tags,
           scoped_doc_ids: attachedDocuments.map((document) => document.id),
+          workspace_id: settings?.current_workspace_id ?? null,
         },
         {
           onToken(token) {

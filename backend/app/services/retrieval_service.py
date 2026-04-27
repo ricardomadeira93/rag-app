@@ -56,6 +56,7 @@ class RetrievalService:
         settings: PersistedSettings,
         filters: ChatFilters | None = None,
         debug: bool = False,
+        workspace_id: str | None = None,
     ) -> RetrievalResult:
         query_embedding = await self.embedding_service.embed_query(settings, query)
         where_filter, understanding = self._build_filters(query, filters)
@@ -65,6 +66,7 @@ class RetrievalService:
             query_embedding=query_embedding,
             top_k=max(settings.top_k, 20),
             filters=where_filter,
+            workspace_id=workspace_id,
         )
         
         # 2. Lexical Search (BM25)
@@ -143,6 +145,7 @@ class RetrievalService:
         settings: PersistedSettings,
         filters: ChatFilters | None = None,
         debug: bool = False,
+        workspace_id: str | None = None,
     ) -> RetrievalResult:
         task_queries = [
             query,
@@ -155,7 +158,7 @@ class RetrievalService:
         scoping: ChatScopingInfo | None = None
 
         for task_query in task_queries:
-            result = await self.retrieve(task_query, settings, filters=filters, debug=debug)
+            result = await self.retrieve(task_query, settings, filters=filters, debug=debug, workspace_id=workspace_id)
             combined.extend(result.sources[:4])
             if result.debug:
                 debug_chunks.extend(result.debug.chunks[:4])
@@ -206,10 +209,11 @@ class RetrievalService:
         max_docs: int = 10,
         chars_per_doc: int = 800,
         debug: bool = False,
+        workspace_id: str | None = None,
     ) -> RetrievalResult:
         query_embedding = await self.embedding_service.embed_query(settings, query)
         where_filter, understanding = self._build_filters(query, filters)
-        all_results = self.vector_store.get_all_chunks(filters=where_filter)
+        all_results = self.vector_store.get_all_chunks(filters=where_filter, workspace_id=workspace_id)
 
         documents = all_results.get("documents") or []
         metadatas = all_results.get("metadatas") or []
@@ -272,6 +276,7 @@ class RetrievalService:
                 query_embedding=query_embedding,
                 top_k=min(len(documents), max_docs * 8),
                 filters=where_filter,
+                workspace_id=workspace_id,
             )
             ranked_sources = list(dict.fromkeys(source.filename for source in quick_candidates))
             selected_sources = ranked_sources[:max_docs]
@@ -295,6 +300,7 @@ class RetrievalService:
                 query_embedding=query_embedding,
                 top_k=min(3, max(chunk_count, 1)),
                 filters=doc_filter,
+                workspace_id=workspace_id,
             )
 
             best_source = best_matches[0] if best_matches else None

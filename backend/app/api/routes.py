@@ -106,9 +106,10 @@ async def upload_documents(request: Request, files: list[UploadFile] = File(...)
     container = get_container(request)
     settings = container.settings.get_settings()
     ensure_index_compatible(settings)
+    workspace_id = container.workspaces.get_active_workspace_id_sync()
 
     try:
-        documents = await container.ingestion.ingest_uploads(files, settings)
+        documents = await container.ingestion.ingest_uploads(files, settings, workspace_id=workspace_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -120,6 +121,9 @@ async def chat(request: Request, payload: ChatRequest) -> StreamingResponse:
     container = get_container(request)
     settings = container.settings.get_settings()
     ensure_index_compatible(settings)
+
+    if not payload.workspace_id:
+        payload.workspace_id = container.workspaces.get_active_workspace_id_sync()
 
     # Buffers for persistence — populated as the stream passes through
     assistant_tokens: list[str] = []
@@ -246,7 +250,8 @@ async def update_document_status(request: Request, document_id: str, payload: St
 @router.delete("/documents/{document_id}", response_model=DeleteDocumentResponse)
 async def delete_document(request: Request, document_id: str) -> DeleteDocumentResponse:
     container = get_container(request)
-    deleted = container.ingestion.delete_document(document_id)
+    workspace_id = container.workspaces.get_active_workspace_id_sync()
+    deleted = container.ingestion.delete_document(document_id, workspace_id=workspace_id)
     if deleted is None:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -299,9 +304,10 @@ async def update_document_tags(
 async def reindex_documents(request: Request) -> ReindexResponse:
     container = get_container(request)
     settings = container.settings.get_settings()
+    workspace_id = container.workspaces.get_active_workspace_id_sync()
 
     try:
-        documents = await container.ingestion.reindex_all(settings)
+        documents = await container.ingestion.reindex_all(settings, workspace_id=workspace_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

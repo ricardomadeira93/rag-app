@@ -14,17 +14,17 @@ class BM25Store:
     def initialize(self) -> None:
         return None
 
-    def reset(self) -> None:
+    def reset(self, workspace_id: str | None = None) -> None:
         self._chunks.clear()
 
-    def delete_document(self, document_id: str) -> None:
+    def delete_document(self, document_id: str, workspace_id: str | None = None) -> None:
         self._chunks = {
             chunk_id: payload
             for chunk_id, payload in self._chunks.items()
             if payload.get("document_id") != document_id
         }
 
-    def upsert_chunks(self, document_id: str, chunk_ids: list[str], chunks: list[str], metadatas: list[dict]) -> None:
+    def upsert_chunks(self, document_id: str, chunk_ids: list[str], chunks: list[str], metadatas: list[dict], workspace_id: str | None = None) -> None:
         for chunk_id, chunk, metadata in zip(chunk_ids, chunks, metadatas):
             stored_metadata = dict(metadata)
             stored_metadata["document_id"] = document_id

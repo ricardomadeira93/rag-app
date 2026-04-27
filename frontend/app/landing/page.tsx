@@ -1,51 +1,82 @@
 "use client";
 
+import {
+  ArrowRight,
+  Database,
+  FileText,
+  LayoutDashboard,
+  MessageSquare,
+  Milestone,
+  Search,
+  ShieldCheck,
+  Upload,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-const STACK = [
-  { name: "FastAPI", desc: "High-performance Python backend" },
-  { name: "Next.js 15", desc: "Modern React framework" },
-  { name: "Groq", desc: "Ultra-fast LLM inference" },
-  { name: "Pinecone", desc: "Serverless vector database" },
-  { name: "Whisper", desc: "AI-powered audio transcription" },
-  { name: "TypeScript", desc: "Type-safe frontend logic" },
+type Mode = "overview" | "explore";
+
+const SKILLS = [
+  "TypeScript", "Python", "React", "Next.js", "FastAPI",
+  "RAG / LLM systems", "PostgreSQL", "Docker", "System design", "Node.js",
 ];
 
 const FEATURES = [
   {
-    title: "Multi-Format Ingestion",
-    desc: "Seamlessly process PDFs, Markdown, Word docs, and even Voice Recordings via OpenAI Whisper integration.",
-    icon: "📂",
+    Icon: Search,
+    title: "Semantic retrieval, not keyword search",
+    tag: "HOW IT WORKS",
+    body: "Queries are embedded and matched against indexed document chunks using vector similarity, so \"has he worked with distributed systems?\" finds the right context even if those words don't appear verbatim.",
   },
   {
-    title: "Contextual Retrieval",
-    desc: "Hybrid search combining vector embeddings (multilingual-e5-large) with BM25 keyword matching for maximum relevance.",
-    icon: "🔍",
+    Icon: ShieldCheck,
+    title: "Every answer cites its source",
+    tag: "TRUST & VERIFICATION",
+    body: "Stark grounds every response in retrieved context. Each answer links to the exact document and chunk it came from. No fabrication, no guessing, just retrieval.",
   },
   {
-    title: "Verifiable Accuracy",
-    desc: "Every response is grounded in retrieved context with strict citation mapping. No hallucinations, just data-driven answers.",
-    icon: "🔗",
+    Icon: FileText,
+    title: "Multi-format ingestion",
+    tag: "BEYOND TEXT",
+    body: "PDFs, Word docs, Markdown, audio recordings (via Whisper), and images are all parsed, chunked, embedded, and indexed. The engine doesn't care about format.",
   },
   {
-    title: "Instant Inference",
-    desc: "Powered by Groq LPUs for sub-second response times, delivering a near-instantaneous chat experience.",
-    icon: "⚡",
+    Icon: Zap,
+    title: "Sub-second inference on Groq",
+    tag: "PERFORMANCE",
+    body: "LLM calls run on Groq LPUs, the fastest inference hardware available. Retrieval is near-instant on Pinecone serverless. The whole round-trip typically completes in under 2 seconds.",
   },
 ];
 
+const PIPELINE = [
+  { label: "Upload", sub: "PDF / Audio / MD", Icon: Upload },
+  { label: "Embed", sub: "E5-Large multilingual", Icon: Database },
+  { label: "Index", sub: "Pinecone serverless", Icon: Milestone },
+  { label: "Retrieve", sub: "Semantic similarity", Icon: Search },
+  { label: "Respond", sub: "Groq + citations", Icon: MessageSquare },
+];
+
+const STACK = [
+  "FastAPI", "Next.js 15", "Python 3.11", "Groq", "Pinecone",
+  "SQLite", "TypeScript", "faster-whisper", "LiteLLM", "multilingual-e5-large",
+];
+
 const SUGGESTED_QUESTIONS = [
-  "What is the core architecture of Stark?",
-  "How does Ricardo implement the RAG pipeline?",
-  "Tell me about Ricardo's experience with full-stack development.",
-  "What are the most complex projects indexed in this system?",
-  "How does this tool handle audio and image data?",
-  "What technologies is Ricardo most proficient in?",
+  "What programming languages and frameworks does Ricardo work with?",
+  "Tell me about a project where Ricardo owned the full stack.",
+  "What's Ricardo's experience with AI and machine learning?",
+  "How does Ricardo approach system design and architecture?",
+  "What makes Ricardo a strong engineering hire?",
+  "What's the most complex technical problem Ricardo has solved?",
+  "Has Ricardo worked in early-stage startup environments?",
+  "What kind of teams has Ricardo worked in?",
 ];
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
+  const [mode, setMode] = useState<Mode>("overview");
   const heroRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -55,182 +86,230 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div style={{ background: "#0e0e0d", color: "#c9c8c2", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", minHeight: "100vh", overflowX: "hidden" }}>
-      
+    <div className="landing-root">
+
       {/* ── Nav ── */}
-      <nav style={{
-        position: "sticky", top: 0, zIndex: 50,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 clamp(20px, 5vw, 80px)", height: 64,
-        borderBottom: scrolled ? "1px solid #222220" : "1px solid transparent",
-        background: scrolled ? "rgba(14,14,13,0.92)" : "transparent",
-        backdropFilter: scrolled ? "blur(12px)" : "none",
-        transition: "background 200ms ease, border-color 200ms ease",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #5b5bd6 0%, #7c7cf0 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff" }}>S</div>
-          <span style={{ fontSize: 18, fontWeight: 700, color: "#ededea", letterSpacing: "-0.02em" }}>Stark</span>
+      <nav className={`landing-nav ${scrolled ? "landing-nav--scrolled" : ""}`}>
+        <div className="landing-nav__brand">
+          <div className="landing-brand-icon">S</div>
+          <span className="landing-brand-name">Stark</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-          <div style={{ display: "flex", gap: 24, fontSize: 13, fontWeight: 500, color: "#8b8882" }}>
-            <a href="#engine" style={{ textDecoration: "none", color: "inherit" }}>The Engine</a>
-            <a href="#demo" style={{ textDecoration: "none", color: "inherit" }}>Live Demo</a>
-            <a href="#stack" style={{ textDecoration: "none", color: "inherit" }}>Stack</a>
+        <div className="landing-nav__right">
+          <div className="landing-nav__links">
+            <Link href="/dashboard" className="landing-nav__link">
+              <LayoutDashboard size={13} strokeWidth={1.75} />
+              Dashboard
+            </Link>
+            <Link href="/documents" className="landing-nav__link">
+              <FileText size={13} strokeWidth={1.75} />
+              Documents
+            </Link>
           </div>
-          <Link
-            href="/chat"
-            style={{ display: "inline-flex", alignItems: "center", height: 36, padding: "0 16px", borderRadius: 6, background: "#5b5bd6", color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none", transition: "background 150ms" }}
-          >
-            Launch App
+
+          <div className="landing-nav__divider" />
+
+          {/* Mode toggle */}
+          <div className="landing-mode-switcher">
+            {(["overview", "explore"] as Mode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className={`landing-mode-btn ${mode === m ? "landing-mode-btn--active" : ""}`}
+              >
+                {m === "overview" ? "How it works" : "Try the demo"}
+              </button>
+            ))}
+          </div>
+
+          <ThemeToggle />
+
+          <Link href="/chat" className="landing-cta-sm">
+            Open assistant <ArrowRight size={12} strokeWidth={2} />
           </Link>
         </div>
       </nav>
 
       {/* ── Hero ── */}
-      <section style={{ padding: "clamp(100px, 15vw, 180px) clamp(20px, 5vw, 80px) 100px", maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 20, background: "rgba(91, 91, 214, 0.1)", border: "1px solid rgba(91, 91, 214, 0.2)", marginBottom: 24 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#5b5bd6" }}></span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#7c7cf0", letterSpacing: "0.05em", textTransform: "uppercase" }}>Open Source RAG Engine</span>
-        </div>
-        
-        <h1 style={{ fontSize: "clamp(40px, 7vw, 84px)", fontWeight: 800, lineHeight: 1, letterSpacing: "-0.04em", color: "#ededea", margin: "0 auto 32px", maxWidth: 900 }}>
-          Talk to your data with <span style={{ background: "linear-gradient(to right, #7c7cf0, #5b5bd6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>surgical precision.</span>
+      <section
+        ref={heroRef}
+        className="landing-section landing-hero"
+      >
+        <p className="landing-label">
+          {mode === "overview" ? "RAG engine · Full-stack AI project" : "Live demo · Indexed knowledge base"}
+        </p>
+        <h1 className="landing-h1">
+          {mode === "overview"
+            ? <>Private data. Searchable.{" "}<span className="landing-accent">Trustworthy.</span></>
+            : <>Ask anything.{" "}<span className="landing-accent">Get cited answers.</span></>
+          }
         </h1>
-        
-        <p style={{ fontSize: "clamp(16px, 2.5vw, 20px)", lineHeight: 1.6, color: "#8b8882", maxWidth: 640, margin: "0 auto 48px" }}>
-          Stark is a high-performance Retrieval-Augmented Generation (RAG) platform designed to turn private documentation into actionable intelligence.
+        <p className="landing-hero__sub">
+          {mode === "overview"
+            ? "Stark is a retrieval-augmented generation engine. Upload your documents, ask questions in plain language, and get answers grounded in your actual content with citations."
+            : "This instance is indexed with Ricardo Madeira's CV, project case studies, and technical notes. Ask anything about his background, and the engine retrieves and cites every answer from those documents."
+          }
         </p>
 
-        <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
-          <Link
-            href="/chat"
-            style={{ display: "inline-flex", alignItems: "center", height: 52, padding: "0 32px", borderRadius: 8, background: "#5b5bd6", color: "#fff", fontSize: 15, fontWeight: 600, textDecoration: "none", transition: "transform 200ms" }}
-          >
-            Try the Demo
+        <div className="landing-cta-row">
+          <Link href="/chat" className="landing-btn-primary">
+            Talk to the AI
           </Link>
-          <a
-            href="#engine"
-            style={{ display: "inline-flex", alignItems: "center", height: 52, padding: "0 32px", borderRadius: 8, border: "1px solid #2e2d2a", color: "#ededea", fontSize: 15, fontWeight: 600, textDecoration: "none" }}
-          >
-            How it Works
-          </a>
+          <Link href="/dashboard" className="landing-btn-secondary">
+            View backend dashboard <ArrowRight size={14} strokeWidth={1.75} />
+          </Link>
         </div>
       </section>
 
-      {/* ── The Engine (RAG Visualization) ── */}
-      <section id="engine" style={{ borderTop: "1px solid #1a1a18", background: "#111110", padding: "100px clamp(20px, 5vw, 80px)" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 80 }}>
-            <h2 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, color: "#ededea", marginBottom: 20 }}>Built for Accuracy.</h2>
-            <p style={{ fontSize: 18, color: "#8b8882", maxWidth: 600, margin: "0 auto" }}>
-              Most AI assistants guess. Stark retrieves. Our engine follows a strict multi-stage pipeline to ensure every answer is grounded in truth.
-            </p>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 40, marginBottom: 100 }}>
-            {FEATURES.map((f, i) => (
-              <div key={i} style={{ background: "#0e0e0d", padding: "32px", borderRadius: 12, border: "1px solid #1a1a18", transition: "transform 200ms", cursor: "default" }} onMouseOver={(e) => e.currentTarget.style.transform = "translateY(-5px)"} onMouseOut={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-                <div style={{ fontSize: 32, marginBottom: 20 }}>{f.icon}</div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: "#ededea", marginBottom: 12 }}>{f.title}</h3>
-                <p style={{ fontSize: 14, color: "#8b8882", lineHeight: 1.6 }}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* ── Visual Pipeline ── */}
-          <div style={{ padding: "40px", borderRadius: 20, background: "rgba(91, 91, 214, 0.03)", border: "1px solid rgba(91, 91, 214, 0.1)" }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: "#5b5bd6", textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "center", marginBottom: 40 }}>The RAG Pipeline</p>
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "20px" }}>
-              {[
-                { label: "Data Source", sub: "PDF / Audio / MD", icon: "📄" },
-                { label: "Embedding", sub: "E5-Large V3", icon: "🧬" },
-                { label: "Vector Store", sub: "Pinecone / Indexing", icon: "📦" },
-                { label: "Retrieval", sub: "Context Fetching", icon: "🎯" },
-                { label: "LLM Response", sub: "Groq LPU / Citations", icon: "💬" },
-              ].map((step, i, arr) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                  <div style={{ textAlign: "center", width: "140px" }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 12, background: "#1a1a18", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, margin: "0 auto 12px", border: "1px solid #222220" }}>{step.icon}</div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#ededea", marginBottom: 4 }}>{step.label}</p>
-                    <p style={{ fontSize: 11, color: "#6b6863" }}>{step.sub}</p>
+      {/* ════════ HOW IT WORKS MODE ════════ */}
+      {mode === "overview" && (
+        <>
+          {/* Features */}
+          <section className="landing-section landing-section--alt">
+            <div className="landing-container">
+              <p className="landing-label">What the engine does</p>
+              <h2 className="landing-h2">Retrieval, not generation.</h2>
+              <p className="landing-body landing-body--wide">
+                Unlike a general-purpose chatbot, Stark only answers from what you give it. No invented facts, no hallucinated credentials, just grounded retrieval from your indexed documents.
+              </p>
+              <div className="landing-feature-grid">
+                {FEATURES.map((f) => (
+                  <div key={f.title} className="landing-feature-card">
+                    <p className="landing-feature-tag">{f.tag}</p>
+                    <div className="landing-feature-title">
+                      <f.Icon size={15} strokeWidth={1.75} className="landing-feature-icon" />
+                      {f.title}
+                    </div>
+                    <p className="landing-feature-body">{f.body}</p>
                   </div>
-                  {i < arr.length - 1 && (
-                    <div style={{ color: "#222220", fontSize: 20, fontWeight: 300, display: "flex", alignItems: "center" }}>→</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── The Demo (Knowledge Base Showcase) ── */}
-      <section id="demo" style={{ borderTop: "1px solid #1a1a18", padding: "100px clamp(20px, 5vw, 80px)" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: 64, alignItems: "center" }}>
-          <div>
-            <h2 style={{ fontSize: 40, fontWeight: 700, color: "#ededea", marginBottom: 24 }}>The Live Demo.</h2>
-            <p style={{ fontSize: 16, color: "#8b8882", lineHeight: 1.7, marginBottom: 32 }}>
-              To demonstrate Stark&apos;s capabilities, we&apos;ve indexed a curated knowledge base consisting of <strong>Ricardo Madeira&apos;s</strong> professional background, technical projects, and engineering philosophy.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {["12 Documents Indexed", "4 Audio Transcriptions", "Full Technical Case Studies"].map((item, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, color: "#ededea", fontSize: 15, marginBottom: 12 }}>
-                  <span style={{ color: "#5b5bd6" }}>✓</span> {item}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ background: "#111110", padding: "32px", borderRadius: 16, border: "1px solid #1a1a18" }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: "#5b5bd6", textTransform: "uppercase", marginBottom: 16 }}>Suggested Queries</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {SUGGESTED_QUESTIONS.map((q, i) => (
-                <Link
-                  key={i}
-                  href={`/chat?q=${encodeURIComponent(q)}`}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px", background: "#0e0e0d", border: "1px solid #222220", borderRadius: 8, textDecoration: "none", color: "#ededea", fontSize: 13, transition: "border-color 200ms" }}
-                >
-                  <span style={{ color: "#5b5bd6" }}>→</span> {q}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Technical Stack ── */}
-      <section id="stack" style={{ borderTop: "1px solid #1a1a18", background: "#111110", padding: "100px clamp(20px, 5vw, 80px)" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
-          <h2 style={{ fontSize: 32, fontWeight: 700, color: "#ededea", marginBottom: 48 }}>Engine Specs.</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 24 }}>
-            {STACK.map((s, i) => (
-              <div key={i} style={{ padding: "24px", textAlign: "center" }}>
-                <p style={{ fontSize: 16, fontWeight: 700, color: "#ededea", marginBottom: 8 }}>{s.name}</p>
-                <p style={{ fontSize: 12, color: "#8b8882" }}>{s.desc}</p>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+            </div>
+          </section>
 
-      {/* ── CTA ── */}
-      <section style={{ borderTop: "1px solid #1a1a18", padding: "120px 20px", textAlign: "center" }}>
-        <h2 style={{ fontSize: 48, fontWeight: 800, color: "#ededea", marginBottom: 24 }}>Ready to see it in action?</h2>
-        <p style={{ fontSize: 18, color: "#8b8882", maxWidth: 500, margin: "0 auto 40px" }}>
-          Launch the assistant and ask anything about the system or the data it contains.
+          {/* Pipeline */}
+          <section className="landing-section">
+            <div className="landing-container">
+              <p className="landing-label">The pipeline</p>
+              <h2 className="landing-h2">From upload to answer in under 2 seconds.</h2>
+              <p className="landing-body landing-body--wide">
+                Each stage is independently optimised: multilingual embeddings, serverless vector storage, and Groq LPU inference.
+              </p>
+              <div className="landing-pipeline">
+                {PIPELINE.map((step, i) => (
+                  <div key={step.label} className="landing-pipeline__item">
+                    <div className="landing-pipeline__step">
+                      <div className="landing-pipeline__icon-wrap">
+                        <step.Icon size={20} strokeWidth={1.5} />
+                      </div>
+                      <p className="landing-pipeline__label">{step.label}</p>
+                      <p className="landing-pipeline__sub">{step.sub}</p>
+                    </div>
+                    {i < PIPELINE.length - 1 && (
+                      <ArrowRight size={16} className="landing-pipeline__arrow" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Stack bar */}
+          <section className="landing-section landing-section--alt landing-section--compact">
+            <div className="landing-container landing-stack-bar">
+              <span className="landing-stack-bar__label">Built with</span>
+              {STACK.map((tech) => (
+                <span key={tech} className="landing-stack-bar__tech">{tech}</span>
+              ))}
+            </div>
+          </section>
+
+          {/* CTA to demo */}
+          <section className="landing-section">
+            <div className="landing-container">
+              <p className="landing-label">See it live</p>
+              <h2 className="landing-h2">The demo is indexed with Ricardo&apos;s background.</h2>
+              <p className="landing-body landing-body--wide">
+                To demonstrate the engine with real data, this instance is loaded with Ricardo Madeira&apos;s CV, project write-ups, and technical notes. Ask it anything. It can only answer from what&apos;s in those documents.
+              </p>
+              <div className="landing-cta-row">
+                <button
+                  type="button"
+                  onClick={() => setMode("explore")}
+                  className="landing-btn-primary"
+                >
+                  Explore the demo <ArrowRight size={14} strokeWidth={1.75} />
+                </button>
+                <Link href="/documents" className="landing-btn-secondary">
+                  See indexed documents <ArrowRight size={14} strokeWidth={1.75} />
+                </Link>
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
+      {/* ════════ EXPLORE / DEMO MODE ════════ */}
+      {mode === "explore" && (
+        <>
+          {/* Who is indexed */}
+          <section className="landing-section">
+            <div className="landing-container">
+              <p className="landing-label">What&apos;s indexed</p>
+              <h2 className="landing-h2">Ricardo Madeira, Engineer.</h2>
+              <p className="landing-body landing-body--wide">
+                Full-stack engineer focused on AI-powered product development. This knowledge base contains his CV, project case studies, technical write-ups, and engineering notes. The assistant can only answer from these documents and it can&apos;t invent credentials he doesn&apos;t have.
+              </p>
+              <div className="landing-skill-pills">
+                {SKILLS.map((skill) => (
+                  <span key={skill} className="landing-pill">{skill}</span>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Suggested questions */}
+          <section className="landing-section landing-section--alt">
+            <div className="landing-container">
+              <p className="landing-label">Start with a question</p>
+              <h2 className="landing-h2">Not sure what to ask? Pick one.</h2>
+              <p className="landing-body">
+                Each card opens the assistant with that prompt pre-filled. Every response will cite the source document it retrieved from.
+              </p>
+              <div className="landing-question-grid">
+                {SUGGESTED_QUESTIONS.map((q) => (
+                  <Link
+                    key={q}
+                    href={`/chat?q=${encodeURIComponent(q)}`}
+                    className="landing-question-card"
+                  >
+                    <ArrowRight size={14} className="landing-question-arrow" strokeWidth={2} />
+                    <span className="landing-question-text">{q}</span>
+                  </Link>
+                ))}
+              </div>
+              <Link href="/chat" className="landing-btn-secondary">
+                Or ask your own question <ArrowRight size={14} strokeWidth={1.75} />
+              </Link>
+            </div>
+          </section>
+        </>
+      )}
+
+      {/* ── Footer CTA ── */}
+      <section className="landing-section landing-footer-cta">
+        <p className="landing-label" style={{ textAlign: "center" }}>Ready?</p>
+        <h2 className="landing-h2 landing-h2--center">
+          Stop reading. Start asking.
+        </h2>
+        <p className="landing-footer-sub">
+          The assistant is live. Ask anything: projects, stack, approach, experience. Every answer comes with a source.
         </p>
-        <Link
-          href="/chat"
-          style={{ display: "inline-flex", alignItems: "center", height: 56, padding: "0 40px", borderRadius: 8, background: "#5b5bd6", color: "#fff", fontSize: 16, fontWeight: 600, textDecoration: "none" }}
-        >
-          Open Assistant
+        <Link href="/chat" className="landing-btn-primary landing-btn-primary--lg">
+          Start a conversation
         </Link>
       </section>
-
-      <footer style={{ padding: "40px 20px", textAlign: "center", borderTop: "1px solid #1a1a18", color: "#3d3c38", fontSize: 12, letterSpacing: "0.05em" }}>
-        STARK ENGINE // BUILT BY RICARDO MADEIRA
-      </footer>
     </div>
   );
 }

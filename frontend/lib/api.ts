@@ -145,6 +145,7 @@ export async function streamChat(
     mentioned_doc_ids?: string[];
     tags?: string[];
     scoped_doc_ids?: string[];
+    workspace_id?: string | null;
   },
   handlers: {
     onToken: (token: string) => void;
@@ -171,6 +172,7 @@ export async function streamChat(
       mentioned_doc_ids: options.mentioned_doc_ids ?? [],
       tags: options.tags ?? [],
       scoped_doc_ids: options.scoped_doc_ids ?? [],
+      workspace_id: options.workspace_id ?? null,
     }),
   });
 

@@ -207,6 +207,7 @@ class ChatService:
                 max_docs=10,
                 chars_per_doc=800,
                 debug=request.debug,
+                workspace_id=request.workspace_id,
             )
         elif response_mode == "action_items":
             retrieval = await self.retrieval_service.action_item_retrieve(
@@ -214,6 +215,7 @@ class ChatService:
                 settings=settings,
                 filters=effective_filters,
                 debug=request.debug,
+                workspace_id=request.workspace_id,
             )
         else:
             retrieval = await self.retrieval_service.retrieve(
@@ -221,6 +223,7 @@ class ChatService:
                 settings=settings,
                 filters=effective_filters,
                 debug=request.debug,
+                workspace_id=request.workspace_id,
             )
         retrieval.sources = await self._prepend_mentioned_sources(
             prompt=prompt,

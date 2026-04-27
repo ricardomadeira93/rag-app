@@ -83,6 +83,7 @@ class ChatRequest(BaseModel):
     mentioned_doc_ids: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     scoped_doc_ids: list[str] = Field(default_factory=list)
+    workspace_id: str | None = None  # scopes vector retrieval to a specific Pinecone namespace
 
     @property
     def latest_user_message(self) -> Optional[str]:
@@ -90,3 +91,4 @@ class ChatRequest(BaseModel):
             if message.role == "user":
                 return message.content
         return None
+

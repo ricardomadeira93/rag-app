@@ -18,7 +18,7 @@ import {
   MessageSquare,
   PenLine,
   RefreshCw,
-  Sparkles,
+  Bot,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
@@ -70,7 +70,7 @@ export function MessageBlock({
       <div className={`flex max-w-[75%] gap-2 ${isUser ? "justify-end" : "items-start"}`}>
         {!isUser ? (
           <div className="mt-1 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white">
-            <Sparkles className="h-[11px] w-[11px]" />
+            <Bot className="h-[11px] w-[11px]" />
           </div>
         ) : null}
 

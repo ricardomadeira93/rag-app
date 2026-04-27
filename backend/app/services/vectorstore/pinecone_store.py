@@ -46,8 +46,9 @@ class PineconeVectorStore(VectorStore):
         embeddings: list[list[float]],
         signature: EmbeddingSignature,
         chunk_metas: list[ChunkWithMeta] | None = None,
+        workspace_id: str | None = None,
     ) -> None:
-        self.delete_document(document.id)
+        self.delete_document(document.id, workspace_id=workspace_id)
         
         vectors = []
         for index in range(len(chunks)):
@@ -86,17 +87,18 @@ class PineconeVectorStore(VectorStore):
             
             # Batch upsert to avoid payload limits
             if len(vectors) >= 100:
-                self.index.upsert(vectors=vectors)
+                self.index.upsert(vectors=vectors, namespace=workspace_id or "")
                 vectors = []
                 
         if vectors:
-            self.index.upsert(vectors=vectors)
+            self.index.upsert(vectors=vectors, namespace=workspace_id or "")
 
     def query(
         self,
         query_embedding: list[float],
         top_k: int,
         filters: dict[str, Any] | None = None,
+        workspace_id: str | None = None,
     ) -> list[SourceCitation]:
         pinecone_filter = self._convert_filters(filters)
         
@@ -104,12 +106,13 @@ class PineconeVectorStore(VectorStore):
             vector=query_embedding,
             top_k=top_k,
             filter=pinecone_filter,
-            include_metadata=True
+            include_metadata=True,
+            namespace=workspace_id or ""
         )
         
         return self._to_sources(results)
 
-    def delete_document(self, document_id: str) -> None:
+    def delete_document(self, document_id: str, workspace_id: str | None = None) -> None:
         # Pinecone Serverless doesn't support delete by filter.
         # We must list the IDs or use delete by metadata if supported, but Serverless restricts delete by metadata.
         # However, for a simple implementation, assuming namespaces or we keep track of IDs.
@@ -120,22 +123,26 @@ class PineconeVectorStore(VectorStore):
                 vector=dummy_vector,
                 top_k=1000,
                 filter={"document_id": {"$eq": document_id}},
-                include_metadata=False
+                include_metadata=False,
+                namespace=workspace_id or ""
             )
             ids_to_delete = [match.id for match in res.matches]
             if not ids_to_delete:
                 break
-            self.index.delete(ids=ids_to_delete)
+            self.index.delete(ids=ids_to_delete, namespace=workspace_id or "")
 
-    def reset(self) -> None:
-        # Dangerous, normally we don't want to wipe the whole prod index, but to match protocol:
-        self.index.delete(delete_all=True)
+    def reset(self, workspace_id: str | None = None) -> None:
+        self.index.delete(delete_all=True, namespace=workspace_id or "")
 
-    def count(self) -> int:
+    def count(self, workspace_id: str | None = None) -> int:
+        # Fall back to global count if namespaces aren't well mapped in stats
         stats = self.index.describe_index_stats()
+        ns = workspace_id or ""
+        if "namespaces" in stats and ns in stats["namespaces"]:
+            return stats["namespaces"][ns].get("vector_count", 0)
         return stats.get("total_vector_count", 0)
 
-    def get_all_chunks(self, filters: dict[str, Any] | None = None) -> dict[str, Any]:
+    def get_all_chunks(self, filters: dict[str, Any] | None = None, workspace_id: str | None = None) -> dict[str, Any]:
         # Mimic Chroma's get_all_chunks by querying a large number of docs.
         # This is a limitation of Pinecone compared to Chroma.
         dummy_vector = [0.0] * PINECONE_DIMENSION
@@ -145,7 +152,8 @@ class PineconeVectorStore(VectorStore):
             vector=dummy_vector,
             top_k=10000,
             filter=pinecone_filter,
-            include_metadata=True
+            include_metadata=True,
+            namespace=workspace_id or ""
         )
         
         documents = []

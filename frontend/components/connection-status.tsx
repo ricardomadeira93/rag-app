@@ -6,6 +6,13 @@ type Phase = "connecting" | "connected" | "hidden";
 
 export function ConnectionStatus({ resolved }: { resolved: boolean }) {
   const [phase, setPhase] = useState<Phase>("connecting");
+  const [slow, setSlow] = useState(false);
+
+  // Show cold-start notice after 4s if still connecting
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!resolved || phase !== "connecting") return;
@@ -34,7 +41,7 @@ export function ConnectionStatus({ resolved }: { resolved: boolean }) {
           borderColor: "rgba(255, 255, 255, 0.06)",
           boxShadow:
             "0 8px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255,255,255,0.03)",
-          minWidth: 220,
+          minWidth: 240,
         }}
       >
         {isConnected ? (
@@ -61,7 +68,7 @@ export function ConnectionStatus({ resolved }: { resolved: boolean }) {
         ) : (
           <>
             <div
-              className="h-4 w-4 animate-spin rounded-full border-2"
+              className="h-4 w-4 animate-spin rounded-full border-2 shrink-0"
               style={{
                 borderColor: "rgba(124, 124, 240, 0.3)",
                 borderTopColor: "#7c7cf0",
@@ -72,13 +79,15 @@ export function ConnectionStatus({ resolved }: { resolved: boolean }) {
                 className="text-[13px] font-semibold leading-tight"
                 style={{ color: "#ededea" }}
               >
-                Connecting to AI
+                Warming up the AI
               </p>
               <p
-                className="mt-0.5 text-[11px] leading-tight"
+                className="mt-0.5 text-[11px] leading-snug"
                 style={{ color: "#8b8882" }}
               >
-                Your assistant will be ready in a moment
+                {slow
+                  ? "Free-tier server cold starting — usually under 60s"
+                  : "Your assistant will be ready in a moment"}
               </p>
             </div>
           </>

@@ -26,6 +26,7 @@ class ChromaVectorStore:
         embeddings: list[list[float]],
         signature: EmbeddingSignature,
         chunk_metas: list[ChunkWithMeta] | None = None,
+        workspace_id: str | None = None,
     ) -> None:
         collection = self._get_collection()
         collection.delete(where={"document_id": document.id})
@@ -67,6 +68,7 @@ class ChromaVectorStore:
         query_embedding: list[float],
         top_k: int,
         filters: dict[str, Any] | None = None,
+        workspace_id: str | None = None,
     ) -> list[SourceCitation]:
         collection = self._get_collection()
         query_args: dict[str, Any] = {
@@ -82,21 +84,21 @@ class ChromaVectorStore:
         results = collection.query(**query_args)
         return self._to_sources(results)
 
-    def delete_document(self, document_id: str) -> None:
+    def delete_document(self, document_id: str, workspace_id: str | None = None) -> None:
         collection = self._get_collection()
         collection.delete(where={"document_id": document_id})
 
-    def reset(self) -> None:
+    def reset(self, workspace_id: str | None = None) -> None:
         try:
             self.client.delete_collection(self.collection_name)
         except Exception:
             pass
         self._get_collection()
 
-    def count(self) -> int:
+    def count(self, workspace_id: str | None = None) -> int:
         return self._get_collection().count()
 
-    def get_all_chunks(self, filters: dict[str, Any] | None = None) -> dict[str, Any]:
+    def get_all_chunks(self, filters: dict[str, Any] | None = None, workspace_id: str | None = None) -> dict[str, Any]:
         collection = self._get_collection()
         query_args: dict[str, Any] = {
             "include": ["documents", "metadatas"],

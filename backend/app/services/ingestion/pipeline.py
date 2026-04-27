@@ -44,6 +44,7 @@ class IngestionPipeline:
         self,
         files: list[UploadFile],
         settings: PersistedSettings,
+        workspace_id: str | None = None,
     ) -> list[DocumentRecord]:
         from app.services.parsers.email_parser import parse_eml
         from app.services.parsers.slack_parser import parse_slack_export
@@ -99,13 +100,14 @@ class IngestionPipeline:
                     mime_type=mime_type,
                     settings=settings,
                     document_id=placeholder.id,
+                    workspace_id=workspace_id,
                 )
             )
         return queued_documents
 
-    async def reindex_all(self, settings: PersistedSettings) -> list[DocumentRecord]:
+    async def reindex_all(self, settings: PersistedSettings, workspace_id: str | None = None) -> list[DocumentRecord]:
         existing_documents = self.document_service.list_documents()
-        self.vector_store.reset()
+        self.vector_store.reset(workspace_id=workspace_id)
         self.bm25_store.reset()
 
         # Mark all docs as needing reprocessing before we start
@@ -119,13 +121,13 @@ class IngestionPipeline:
             async with semaphore:
                 try:
                     return await self._index_saved_file(
-                        Path(document.source_path), document.filename, document.mime_type, settings
+                        Path(document.source_path), document.filename, document.mime_type, settings,
+                        workspace_id=workspace_id,
                     )
                 except Exception as exc:
                     self.document_service.update_status(
                         document.id, "failed", error_message=str(exc)
                     )
-                    # Preserve the existing record with failed status
                     return self.document_service.get_document(document.id)
 
         tasks = [_reindex_doc(doc) for doc in existing_documents]
@@ -134,12 +136,12 @@ class IngestionPipeline:
 
         return updated_documents
 
-    def delete_document(self, document_id: str) -> DocumentRecord | None:
+    def delete_document(self, document_id: str, workspace_id: str | None = None) -> DocumentRecord | None:
         existing = self.document_service.get_document(document_id)
         if existing is None:
             return None
 
-        self.vector_store.delete_document(document_id)
+        self.vector_store.delete_document(document_id, workspace_id=workspace_id)
         self.bm25_store.delete_document(document_id)
         self.document_service.delete_document(document_id)
         return existing
@@ -207,9 +209,10 @@ class IngestionPipeline:
         mime_type: str,
         settings: PersistedSettings,
         document_id: str,
+        workspace_id: str | None = None,
     ) -> None:
         try:
-            await self._index_saved_file(source_path, original_filename, mime_type, settings)
+            await self._index_saved_file(source_path, original_filename, mime_type, settings, workspace_id=workspace_id)
         except Exception as exc:
             self.document_service.update_status(document_id, "failed", error_message=str(exc))
 
@@ -219,6 +222,7 @@ class IngestionPipeline:
         original_filename: str,
         mime_type: str,
         settings: PersistedSettings,
+        workspace_id: str | None = None,
     ) -> DocumentRecord:
         extracted = self.extractor.extract_text(source_path)
         if not extracted.text.strip():
@@ -321,7 +325,7 @@ class IngestionPipeline:
             created_at=timestamp,
             updated_at=timestamp,
         )
-        self.vector_store.upsert_document(document, chunks, embeddings, settings.embedding_signature, chunk_metas=chunk_metas)
+        self.vector_store.upsert_document(document, chunks, embeddings, settings.embedding_signature, chunk_metas=chunk_metas, workspace_id=workspace_id)
         
         # Build metadatas for BM25
         metadatas = []
@@ -344,10 +348,10 @@ class IngestionPipeline:
         self.bm25_store.upsert_chunks(document.id, chunk_ids, chunks, metadatas)
         
         self.document_service.upsert_document(document)
-        asyncio.create_task(self._find_related_documents(document, settings))
+        asyncio.create_task(self._find_related_documents(document, settings, workspace_id=workspace_id))
         return document
 
-    async def _find_related_documents(self, document: DocumentRecord, settings: PersistedSettings) -> None:
+    async def _find_related_documents(self, document: DocumentRecord, settings: PersistedSettings, workspace_id: str | None = None) -> None:
         if not document.summary or not self.document_service.get_document(document.id):
             return
 
@@ -357,6 +361,7 @@ class IngestionPipeline:
                 query_embedding=query_embedding,
                 top_k=12,
                 filters=None,
+                workspace_id=workspace_id,
             )
         except Exception:
             return
