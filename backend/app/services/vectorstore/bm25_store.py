@@ -15,29 +15,42 @@ class BM25Store:
         return None
 
     def reset(self, workspace_id: str | None = None) -> None:
-        self._chunks.clear()
+        if workspace_id is None:
+            self._chunks.clear()
+            return
+        self._chunks = {
+            chunk_id: payload
+            for chunk_id, payload in self._chunks.items()
+            if payload.get("metadata", {}).get("workspace_id") != workspace_id
+        }
 
     def delete_document(self, document_id: str, workspace_id: str | None = None) -> None:
         self._chunks = {
             chunk_id: payload
             for chunk_id, payload in self._chunks.items()
-            if payload.get("document_id") != document_id
+            if not (
+                payload.get("document_id") == document_id
+                and (workspace_id is None or payload.get("metadata", {}).get("workspace_id") == workspace_id)
+            )
         }
 
     def upsert_chunks(self, document_id: str, chunk_ids: list[str], chunks: list[str], metadatas: list[dict], workspace_id: str | None = None) -> None:
         for chunk_id, chunk, metadata in zip(chunk_ids, chunks, metadatas):
             stored_metadata = dict(metadata)
             stored_metadata["document_id"] = document_id
+            stored_metadata["workspace_id"] = workspace_id or ""
             self._chunks[chunk_id] = {
                 "text": chunk,
                 "metadata": stored_metadata,
             }
 
-    def search(self, query: str, top_k: int = 10, filters: dict | None = None) -> list[SourceCitation]:
+    def search(self, query: str, top_k: int = 10, filters: dict | None = None, workspace_id: str | None = None) -> list[SourceCitation]:
         query_terms = {term for term in re.findall(r"\w+", query.lower()) if len(term) > 1}
         scores: list[tuple[int, str, dict[str, object]]] = []
         for chunk_id, payload in self._chunks.items():
             metadata = payload["metadata"]
+            if workspace_id is not None and metadata.get("workspace_id") != workspace_id:
+                continue
             if filters and not _matches_filters(metadata, filters):
                 continue
             text = str(payload["text"])

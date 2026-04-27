@@ -74,6 +74,7 @@ class RetrievalService:
             query=query,
             top_k=max(settings.top_k, 20),
             filters=where_filter,
+            workspace_id=workspace_id,
         )
         
         # 3. Reciprocal Rank Fusion (RRF)

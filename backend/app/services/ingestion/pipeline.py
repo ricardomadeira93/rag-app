@@ -108,7 +108,7 @@ class IngestionPipeline:
     async def reindex_all(self, settings: PersistedSettings, workspace_id: str | None = None) -> list[DocumentRecord]:
         existing_documents = self.document_service.list_documents()
         self.vector_store.reset(workspace_id=workspace_id)
-        self.bm25_store.reset()
+        self.bm25_store.reset(workspace_id=workspace_id)
 
         # Mark all docs as needing reprocessing before we start
         for doc in existing_documents:
@@ -142,7 +142,7 @@ class IngestionPipeline:
             return None
 
         self.vector_store.delete_document(document_id, workspace_id=workspace_id)
-        self.bm25_store.delete_document(document_id)
+        self.bm25_store.delete_document(document_id, workspace_id=workspace_id)
         self.document_service.delete_document(document_id)
         return existing
 
@@ -345,7 +345,7 @@ class IngestionPipeline:
             })
             
         chunk_ids = [f"{document.id}:{i}" for i in range(len(chunks))]
-        self.bm25_store.upsert_chunks(document.id, chunk_ids, chunks, metadatas)
+        self.bm25_store.upsert_chunks(document.id, chunk_ids, chunks, metadatas, workspace_id=workspace_id)
         
         self.document_service.upsert_document(document)
         asyncio.create_task(self._find_related_documents(document, settings, workspace_id=workspace_id))

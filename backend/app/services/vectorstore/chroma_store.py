@@ -29,12 +29,13 @@ class ChromaVectorStore:
         workspace_id: str | None = None,
     ) -> None:
         collection = self._get_collection()
-        collection.delete(where={"document_id": document.id})
+        collection.delete(where=self._scoped_where({"document_id": document.id}, workspace_id))
         ids = [f"{document.id}:{index}" for index in range(len(chunks))]
         metadatas = [
             self._sanitize_metadata(
                 {
                     "document_id": document.id,
+                    "workspace_id": workspace_id or "",
                     "filename": document.filename,
                     "chunk_index": index,
                     "embedding_provider": signature.provider,
@@ -76,19 +77,20 @@ class ChromaVectorStore:
             "n_results": top_k,
             "include": ["documents", "metadatas", "distances"],
         }
-        if filters:
-            if len(filters) == 1:
-                query_args["where"] = filters
-            else:
-                query_args["where"] = {"$and": [{key: value} for key, value in filters.items()]}
+        scoped_where = self._scoped_where(filters, workspace_id)
+        if scoped_where:
+            query_args["where"] = scoped_where
         results = collection.query(**query_args)
         return self._to_sources(results)
 
     def delete_document(self, document_id: str, workspace_id: str | None = None) -> None:
         collection = self._get_collection()
-        collection.delete(where={"document_id": document_id})
+        collection.delete(where=self._scoped_where({"document_id": document_id}, workspace_id))
 
     def reset(self, workspace_id: str | None = None) -> None:
+        if workspace_id:
+            self._get_collection().delete(where={"workspace_id": workspace_id})
+            return
         try:
             self.client.delete_collection(self.collection_name)
         except Exception:
@@ -96,18 +98,19 @@ class ChromaVectorStore:
         self._get_collection()
 
     def count(self, workspace_id: str | None = None) -> int:
-        return self._get_collection().count()
+        if not workspace_id:
+            return self._get_collection().count()
+        results = self._get_collection().get(where={"workspace_id": workspace_id}, include=[])
+        return len(results.get("ids") or [])
 
     def get_all_chunks(self, filters: dict[str, Any] | None = None, workspace_id: str | None = None) -> dict[str, Any]:
         collection = self._get_collection()
         query_args: dict[str, Any] = {
             "include": ["documents", "metadatas"],
         }
-        if filters:
-            if len(filters) == 1:
-                query_args["where"] = filters
-            else:
-                query_args["where"] = {"$and": [{key: value} for key, value in filters.items()]}
+        scoped_where = self._scoped_where(filters, workspace_id)
+        if scoped_where:
+            query_args["where"] = scoped_where
         return collection.get(**query_args)
 
     def _get_collection(self) -> Any:
@@ -163,3 +166,18 @@ class ChromaVectorStore:
             else:
                 sanitized[key] = value
         return sanitized
+
+    def _scoped_where(self, filters: dict[str, Any] | None, workspace_id: str | None) -> dict[str, Any] | None:
+        conditions: list[dict[str, Any]] = []
+        if workspace_id:
+            conditions.append({"workspace_id": workspace_id})
+        if filters:
+            if "$and" in filters:
+                conditions.extend(filters["$and"])
+            else:
+                conditions.extend({key: value} for key, value in filters.items())
+        if not conditions:
+            return None
+        if len(conditions) == 1:
+            return conditions[0]
+        return {"$and": conditions}
