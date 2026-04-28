@@ -433,7 +433,7 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
     <div className="relative min-h-[calc(100vh-72px)]">
       <div className="mx-auto flex min-h-[calc(100vh-72px)] max-w-6xl flex-col px-0 pb-28 pt-2">
         <div className="mx-auto w-full max-w-[680px] px-4">
-          {activeConversationId && conversationMeta ? (
+          {activeConversationId && conversationMeta && !bootstrapping && !conversationLoading ? (
             <div className="mb-6 mt-2 flex items-center justify-between border-b border-[var(--border-soft)] pb-3">
               {isSearching ? (
                 <div className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 py-1.5 focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]">
@@ -585,28 +585,30 @@ export function ChatShell({ conversationId }: { conversationId?: string }) {
         </div>
       ) : null}
 
-      <ChatInput
-        value={input}
-        onValueChange={setInput}
-        onSubmit={handleSubmit}
-        disabled={Boolean(settings?.reindex_required)}
-        loading={loading}
-        modelLabel={settings?.llm_model || "Active model"}
-        semanticRouting={settings?.semantic_routing_enabled}
-        recommendedModels={settings?.recommended_chat_models || []}
-        onModelChange={(model) => void handleSettingChange("llm_model", model)}
-        onToggleRouting={(enabled) => void handleSettingChange("semantic_routing_enabled", enabled)}
-        attachedDocuments={attachedDocuments}
-        availableDocuments={documents}
-        availableSources={sources}
-        onRemoveAttachment={removeAttachment}
-        onAddAttachment={addAttachment}
-        selectedMode={selectedMode}
-        displayMode={lastAssistantMode(messages)}
-        onModeChange={setSelectedMode}
-        onExecuteCommand={(commandId) => void handleCommand(commandId)}
-        attachmentPickerSignal={scopePickerSignal}
-      />
+      {!(bootstrapping || conversationLoading) && (
+        <ChatInput
+          value={input}
+          onValueChange={setInput}
+          onSubmit={handleSubmit}
+          disabled={Boolean(settings?.reindex_required)}
+          loading={loading}
+          modelLabel={settings?.llm_model || "Active model"}
+          semanticRouting={settings?.semantic_routing_enabled}
+          recommendedModels={settings?.recommended_chat_models || []}
+          onModelChange={(model) => void handleSettingChange("llm_model", model)}
+          onToggleRouting={(enabled) => void handleSettingChange("semantic_routing_enabled", enabled)}
+          attachedDocuments={attachedDocuments}
+          availableDocuments={documents}
+          availableSources={sources}
+          onRemoveAttachment={removeAttachment}
+          onAddAttachment={addAttachment}
+          selectedMode={selectedMode}
+          displayMode={lastAssistantMode(messages)}
+          onModeChange={setSelectedMode}
+          onExecuteCommand={(commandId) => void handleCommand(commandId)}
+          attachmentPickerSignal={scopePickerSignal}
+        />
+      )}
 
       <ConfirmDialog
         open={deleteConfirmOpen}
